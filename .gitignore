@@ -1,0 +1,61 @@
+# Ignore: generated files, local machine files, secrets, caches, and dependency folders
+# that can be recreated.
+
+# DO NOT ignore: source code, lockfiles or documentation
+
+# macOS Finder metadata file created automatically on this OS.
+.DS_Store
+
+# Python bytecode cache directory generated when Python imports modules.
+__pycache__/
+# Compiled Python bytecode file.
+*.pyc
+# Optimized Python bytecode file.
+*.pyo
+# Python extension module artifact.
+*.pyd
+
+# Local virtual environment directory commonly used for Python projects.
+.venv/
+# Alternate virtual environment directory name.
+venv/
+# Another common virtual environment directory name.
+env/
+
+# Node package installation directory; recreated from package-lock.json or similar.
+node_modules/
+# Frontend production build output directory.
+dist/
+# Generic build output directory used by many tools.
+build/
+
+# Local environment variable file that may contain secrets.
+.env
+# Environment-specific variable files such as .env.local or .env.development.
+.env.*
+# Keep the example env file tracked as documentation.
+!.env.example
+
+# VS Code workspace settings for one machine; often personal rather than project-wide.
+.vscode/
+# JetBrains IDE project settings directory.
+.idea/
+
+# Test and lint cache directory used by Python tooling.
+.pytest_cache/
+# Static type checker cache directory.
+.mypy_cache/
+# Ruff linter and formatter cache directory.
+.ruff_cache/
+# Coverage.py data file.
+.coverage
+# HTML coverage report output directory.
+htmlcov/
+
+# Log files created by local runs or debugging sessions.
+*.log
+
+# Temporary files created by editors or shell tools.
+*.tmp
+# Backup files often created by editors during manual editing.
+*.bak

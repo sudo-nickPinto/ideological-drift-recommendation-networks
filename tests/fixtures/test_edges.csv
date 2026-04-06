@@ -1,0 +1,115 @@
+# ==============================================================================
+# FILE: test_edges.csv
+# PURPOSE: Synthetic edge (recommendation) data for automated testing.
+# ==============================================================================
+#
+# This file mimics the real "vis_channel_recs2.csv" from the Recfluence dataset.
+# Each row represents one directed recommendation from one channel to another.
+# "Directed" means the edge has a direction: FROM recommends TO, but not
+# necessarily the reverse. Think of it like a one-way street.
+#
+# COLUMN DEFINITIONS (matching the real data exactly):
+# -------------------------------------------------------
+# FROM_CHANNEL_ID     — The source channel. YouTube recommended content FROM
+#                       this channel...
+#
+# TO_CHANNEL_ID       — The target channel. ...TO this channel.
+#                       Together, FROM→TO forms a directed edge in the graph.
+#
+# RELEVANT_IMPRESSIONS_DAILY
+#                     — Estimated daily impressions for this specific
+#                       recommendation link. Higher = this recommendation
+#                       appears more often. This is the EDGE WEIGHT used
+#                       for weighted random walks. A value of 200.0 means
+#                       this recommendation link generates roughly 200
+#                       impressions per day.
+#
+# PERCENT_OF_CHANNEL_RECS
+#                     — What fraction of the source channel's total outgoing
+#                       recommendations this edge represents. For example,
+#                       0.40 means 40% of all recommendations leaving
+#                       ch_L1 point to this particular target.
+#                       All outgoing percentages from one source channel
+#                       should sum to roughly 1.0 (100%).
+#
+# DESIGNED-IN TEST SCENARIOS:
+# -------------------------------------------------------
+#
+# 1. SELF-LOOP (row 1):
+#    ch_R1 → ch_R1. A channel recommending itself. The real data has 6,942
+#    of these. Our graph_builder must filter them out because a self-loop
+#    doesn't represent a meaningful recommendation — it's YouTube
+#    recommending more of the same channel you're already watching.
+#    After filtering: 16 total rows - 1 self-loop = 15 valid edges.
+#
+# 2. LEFT CLUSTER (rows 2–4):
+#    ch_L1 → ch_L2, ch_L1 → ch_L3, ch_L2 → ch_L1.
+#    Left channels recommending other Left channels. This creates a small
+#    echo chamber — once you enter the Left cluster, recommendations keep
+#    you there. Tests can verify assortative mixing (like-recommends-like).
+#
+# 3. RIGHT CLUSTER (rows 5–7):
+#    ch_R1 → ch_R2, ch_R2 → ch_R3, ch_R3 → ch_R1.
+#    Right channels forming a cycle. A random walk starting at ch_R1 would
+#    loop: R1→R2→R3→R1→... staying in the Right cluster forever.
+#
+# 4. CENTER CONNECTIONS (rows 8–9):
+#    ch_C1 → ch_C2, ch_C2 → ch_C3.
+#    Center channels recommending each other.
+#
+# 5. CROSS-IDEOLOGY BRIDGES (rows 10–13):
+#    ch_L1 → ch_C1  (Left → Center)
+#    ch_C1 → ch_R1  (Center → Right)
+#    ch_R2 → ch_C2  (Right → Center)
+#    ch_C3 → ch_L3  (Center → Left)
+#    These edges cross ideological boundaries. They let us test whether
+#    the graph has any cross-cutting recommendations or is fully siloed.
+#
+# 6. DRIFT CHAIN (rows 2, 10, 11, 5):
+#    Following the path: ch_L1 → ch_C1 → ch_R1 → ch_R2
+#    Ideology scores:      -1   →   0   →  +1  →  +1
+#    This chain drifts from Left to Right. The simulator should detect
+#    this as rightward ideological drift. This is the core scenario
+#    the entire project is designed to measure.
+#
+# 7. ISOLATED NODE:
+#    ch_island has NO rows in this file — neither as FROM nor as TO.
+#    It exists in test_nodes.csv but has zero connections. The code
+#    must handle this gracefully (the node exists in the graph but
+#    has no edges).
+#
+# 8. VARYING EDGE WEIGHTS:
+#    RELEVANT_IMPRESSIONS_DAILY ranges from 10.0 to 200.0. When the
+#    simulator does weighted random walks, higher-weight edges should
+#    be followed more often. The L1→L2 edge (200.0) is much "stronger"
+#    than the L1→C1 edge (30.0), meaning a walker leaving ch_L1 is
+#    more likely to stay in the Left cluster than cross to Center.
+#
+# SUMMARY OF EXPECTED TEST ASSERTIONS:
+#   - Total rows in file:            16
+#   - Self-loops:                     1 (ch_R1 → ch_R1)
+#   - Valid edges after filtering:   15
+#   - Nodes with outgoing edges:      8 (ch_island and ch_C3 have none... 
+#                                        wait, ch_C3 has one outgoing)
+#   - Nodes with zero edges at all:   1 (ch_island)
+#   - Cross-ideology edges:           4
+#   - Within-ideology edges:         11
+#
+# ==============================================================================
+FROM_CHANNEL_ID,TO_CHANNEL_ID,RELEVANT_IMPRESSIONS_DAILY,PERCENT_OF_CHANNEL_RECS
+ch_R1,ch_R1,80.0,0.20
+ch_L1,ch_L2,200.0,0.40
+ch_L1,ch_L3,120.0,0.24
+ch_L2,ch_L1,150.0,0.60
+ch_R1,ch_R2,180.0,0.45
+ch_R2,ch_R3,100.0,0.35
+ch_R3,ch_R1,90.0,0.50
+ch_C1,ch_C2,160.0,0.40
+ch_C2,ch_C3,70.0,0.30
+ch_L1,ch_C1,30.0,0.06
+ch_C1,ch_R1,50.0,0.12
+ch_R2,ch_C2,40.0,0.14
+ch_C3,ch_L3,60.0,0.50
+ch_L2,ch_L3,60.0,0.24
+ch_R3,ch_C2,20.0,0.11
+ch_C2,ch_L2,10.0,0.04

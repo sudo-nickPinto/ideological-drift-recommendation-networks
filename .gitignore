@@ -59,3 +59,19 @@ htmlcov/
 *.tmp
 # Backup files often created by editors during manual editing.
 *.bak
+
+# --- Data files ---
+# Large CSV datasets and raw data files are not tracked in Git.
+# They can be obtained from the source documented in data/README.md.
+data/*.csv
+data/*.tsv
+data/*.zip
+# Keep the data README tracked so provenance is always documented.
+!data/README.md
+
+# --- Generated results ---
+# Output artifacts are regenerable from code + data; not tracked.
+results/*
+# Keep .gitkeep files so the directory structure is preserved.
+!results/figures/.gitkeep
+!results/tables/.gitkeep

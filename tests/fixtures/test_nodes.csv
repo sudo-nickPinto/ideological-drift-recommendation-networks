@@ -1,0 +1,105 @@
+ # ==============================================================================
+# FILE: test_nodes.csv
+# PURPOSE: Synthetic node (channel) data for automated testing.
+# ==============================================================================
+#
+# This file mimics the real "vis_channel_stats.csv" from the Recfluence dataset.
+# Each row represents one fake YouTube channel that will become a NODE in the
+# recommendation graph.
+#
+# COLUMN DEFINITIONS (matching the real data exactly):
+# -------------------------------------------------------
+# CHANNEL_ID          — A unique identifier for the channel. In real data this
+#                       is a YouTube channel ID like "UCxxxxxx". Here we use
+#                       short readable IDs like "ch_L1" so tests are easy to
+#                       follow. The prefix (L, C, R) tells you the ideology.
+#
+# CHANNEL_TITLE       — Human-readable name. Purely descriptive; the code
+#                       doesn't use it for analysis, but it makes debugging
+#                       easier when you can see "Left News 1" instead of
+#                       just "ch_L1".
+#
+# CHANNEL_VIEWS       — Total lifetime views for the channel. Included to
+#                       match the real schema. Not used in MVP analysis.
+#
+# COUNTRY             — Channel's country. All set to "US" to match the
+#                       US-politics focus of the real dataset.
+#
+# RELEVANCE           — Float 0–1 indicating what fraction of the channel's
+#                       content is relevant to US politics. We set most to 1.0
+#                       (fully relevant) for simplicity. The isolated node
+#                       gets 0.2 to test low-relevance handling later.
+#
+# SUBS                — Subscriber count. Included to match schema.
+#
+# CHANNEL_LIFETIME_DAILY_VIEWS
+#                     — Average daily views over the channel's lifetime.
+#
+# CHANNEL_LIFETIME_DAILY_VIEWS_RELEVANT
+#                     — Same as above but only counting politically relevant
+#                       views. Often equals CHANNEL_LIFETIME_DAILY_VIEWS
+#                       when RELEVANCE is 1.0.
+#
+# CHANNEL_VIDEO_VIEWS — Total views across all videos. Slightly different
+#                       from CHANNEL_VIEWS in the real data.
+#
+# RELEVANT_IMPRESSIONS_DAILY
+#                     — Estimated daily outgoing recommendation impressions
+#                       (how often this channel's videos appear as
+#                       recommendations on OTHER channels).
+#
+# RELEVANT_IMPRESSIONS_IN_DAILY
+#                     — Estimated daily incoming recommendation impressions
+#                       (how often OTHER channels' recommendations point
+#                       to THIS channel).
+#
+# VIDEO_VIEWS_DAILY   — Average daily video views.
+#
+# RELEVANT_VIDEO_VIEWS_DAILY
+#                     — Average daily views on politically relevant videos.
+#
+# AVG_MINUTES         — Average video length in minutes.
+#
+# FROM_DATE           — Start of the data collection period for this channel.
+#
+# TO_DATE             — End of the data collection period.
+#
+# LR                  — **THE KEY COLUMN.** Ideology classification:
+#                         L = Left    → will be coded as -1
+#                         C = Center  → will be coded as  0
+#                         R = Right   → will be coded as +1
+#                       This is what drives the entire drift analysis.
+#
+# TAGS                — JSON array of category tags. We use simple tags here.
+#                       Included for schema compatibility.
+#
+# IDEOLOGY            — More granular ideology label (e.g., "PartisanLeft",
+#                       "MissingLinkMedia"). Not used in MVP but present
+#                       in the real data.
+#
+# MEDIA               — Media type. "YouTube" for independent creators,
+#                       "Mainstream Media" for traditional outlets.
+#
+# LOGO_URL            — URL to the channel's logo image. Not used in analysis.
+#
+# DESIGNED-IN TEST SCENARIOS:
+# -------------------------------------------------------
+# 1. Three Left nodes (ch_L1, ch_L2, ch_L3)  → verify L scoring works
+# 2. Three Center nodes (ch_C1, ch_C2, ch_C3) → verify C scoring works
+# 3. Three Right nodes (ch_R1, ch_R2, ch_R3) → verify R scoring works
+# 4. One isolated node (ch_island) with no edges → verify code handles
+#    disconnected nodes without crashing
+# 5. Total: 10 nodes → easy to verify by hand
+#
+# ==============================================================================
+CHANNEL_ID,CHANNEL_TITLE,CHANNEL_VIEWS,COUNTRY,RELEVANCE,SUBS,CHANNEL_LIFETIME_DAILY_VIEWS,CHANNEL_LIFETIME_DAILY_VIEWS_RELEVANT,CHANNEL_VIDEO_VIEWS,RELEVANT_IMPRESSIONS_DAILY,RELEVANT_IMPRESSIONS_IN_DAILY,VIDEO_VIEWS_DAILY,RELEVANT_VIDEO_VIEWS_DAILY,AVG_MINUTES,FROM_DATE,TO_DATE,LR,TAGS,IDEOLOGY,MEDIA,LOGO_URL
+ch_L1,Left News 1,500000,US,1.0,10000,500.0,500.0,490000,200.0,150.0,500.0,500.0,12.5,2022-01-01T00:00:00Z,2023-01-01T00:00:00Z,L,"[""PartisanLeft""]",PartisanLeft,YouTube,
+ch_L2,Left News 2,300000,US,1.0,8000,300.0,300.0,295000,180.0,120.0,300.0,300.0,10.0,2022-01-01T00:00:00Z,2023-01-01T00:00:00Z,L,"[""PartisanLeft""]",PartisanLeft,YouTube,
+ch_L3,Left Commentary,200000,US,1.0,5000,200.0,200.0,198000,100.0,90.0,200.0,200.0,15.0,2022-01-01T00:00:00Z,2023-01-01T00:00:00Z,L,"[""SocialJustice""]",SocialJustice,YouTube,
+ch_C1,Center News 1,800000,US,1.0,20000,800.0,800.0,790000,400.0,350.0,800.0,800.0,8.0,2022-01-01T00:00:00Z,2023-01-01T00:00:00Z,C,"[""MainstreamNews""]",MainstreamNews,Mainstream Media,
+ch_C2,Center Analysis,400000,US,1.0,12000,400.0,400.0,395000,250.0,200.0,400.0,400.0,20.0,2022-01-01T00:00:00Z,2023-01-01T00:00:00Z,C,"[""MainstreamNews""]",MainstreamNews,YouTube,
+ch_C3,Center Talk,150000,US,1.0,4000,150.0,150.0,148000,80.0,60.0,150.0,150.0,30.0,2022-01-01T00:00:00Z,2023-01-01T00:00:00Z,C,"[""Libertarian""]",Libertarian,YouTube,
+ch_R1,Right News 1,600000,US,1.0,15000,600.0,600.0,590000,300.0,280.0,600.0,600.0,11.0,2022-01-01T00:00:00Z,2023-01-01T00:00:00Z,R,"[""PartisanRight""]",PartisanRight,YouTube,
+ch_R2,Right News 2,350000,US,1.0,9000,350.0,350.0,345000,190.0,160.0,350.0,350.0,9.0,2022-01-01T00:00:00Z,2023-01-01T00:00:00Z,R,"[""PartisanRight""]",PartisanRight,YouTube,
+ch_R3,Right Commentary,250000,US,1.0,6000,250.0,250.0,248000,130.0,100.0,250.0,250.0,14.0,2022-01-01T00:00:00Z,2023-01-01T00:00:00Z,R,"[""AntiSJW""]",AntiSJW,YouTube,
+ch_island,Isolated Channel,50000,US,0.2,500,50.0,10.0,49000,0.0,0.0,50.0,10.0,5.0,2022-01-01T00:00:00Z,2023-01-01T00:00:00Z,C,"[""Politician""]",Politician,YouTube,

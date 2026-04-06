@@ -4,22 +4,22 @@ This is the persistent step-by-step plan for this project.
 We will move through phases in order and document every decision.
 
 ## Phase 0 - Foundation
-- [ ] 0.1 Initialize Git repository
-- [ ] 0.2 Add README with project goal and scope
-- [ ] 0.3 Add .gitignore
-- [ ] 0.4 Make first commit (project scaffold)
+- [x] 0.1 Initialize Git repository
+- [x] 0.2 Add README with project goal and scope
+- [x] 0.3 Add .gitignore
+- [x] 0.4 Make first commit (project scaffold)
 
 ## Phase 1 - Project Definition
-- [ ] 1.1 Write problem statement
-- [ ] 1.2 Define user and use cases
-- [ ] 1.3 Define MVP and non-goals
-- [ ] 1.4 Define measurable success criteria
+- [x] 1.1 Write problem statement
+- [x] 1.2 Define user and use cases
+- [x] 1.3 Define MVP and non-goals
+- [x] 1.4 Define measurable success criteria
 
 ## Phase 2 - Architecture
-- [ ] 2.1 Choose initial stack
-- [ ] 2.2 Design module boundaries
-- [ ] 2.3 Define data model and contracts
-- [ ] 2.4 Record architecture decisions
+- [x] 2.1 Choose initial stack
+- [x] 2.2 Design module boundaries
+- [x] 2.3 Define data model and contracts
+- [x] 2.4 Record architecture decisions
 
 ## Phase 3 - Implementation
 - [ ] 3.1 Build first vertical slice

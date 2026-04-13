@@ -9,13 +9,9 @@
 #     graph_builder.py  →  ideology.py  →  simulator.py  →  metrics.py  →  visualize.py
 #                          ^^^^^^^^^^^
 #
-# WHAT THIS MODULE DOES:
 #   The graph produced by graph_builder.py has a string label on every node:
 #   "L", "C", or "R". Strings are for humans to read, but math can't operate
-#   on a string. You can't compute the average of ("L", "R", "L", "C") —
-#   you get a TypeError. You CAN compute the average of (-1, 1, -1, 0) = -0.25.
-#
-#   This module bridges that gap. It translates the categorical (text)
+#   on a string. This module bridges that gap. It translates the categorical (text)
 #   ideology label into a quantitative (numeric) ideology score:
 #
 #       "L"  →  -1.0    (Left)
@@ -30,18 +26,18 @@
 #   After this module runs, every node in the graph has an "IDEOLOGY_SCORE"
 #   attribute (a float), which is what the simulator and metrics modules read.
 #
-# WHAT HAPPENS STEP BY STEP:
+# WHAT HAPPENS:
 #   1. Define a lookup dictionary: label → score
 #   2. Iterate over every node in the graph
 #   3. Read each node's LR attribute (attached by graph_builder)
 #   4. Look up the numeric score for that label
 #   5. Attach the numeric score as a new node attribute ("IDEOLOGY_SCORE")
-#   6. Return the modified graph
+#   6. Return the modified graph (same object from graph_builder.py)
 #
 # DESIGN DECISIONS:
 #   - assign_ideology_scores() modifies the graph IN-PLACE and also returns it.
-#     "In-place" means we change the object G itself, not a copy.
-#     Returning G too allows you to chain calls:
+#     "In-place" means we change the object G itself, not a copy/clone.
+#     Returning G too allows you to chain function calls:
 #       G = assign_ideology_scores(build_graph(nodes_df, edges_df))
 #   - Missing or unknown labels get None (Python's "no value").
 #     This prevents silent wrong answers — if a node gets treated as 0.0
@@ -62,15 +58,6 @@ import networkx as nx    # We import nx to use its type in the docstring.
 
 # --- CONSTANTS ----------------------------------------------------------------
 
-# The mapping from text label to numeric score.
-# A dictionary in Python is a set of key → value pairs.
-# You look up a value by its key: LR_TO_SCORE["L"] returns -1.0
-#
-# Why floats (-1.0, 0.0, 1.0) instead of integers (-1, 0, 1)?
-# Because downstream computations (averages, standard deviations) produce
-# floats. Starting with floats avoids implicit integer→float conversions
-# and potential rounding surprises. It also signals to readers that these
-# are measurements on a continuous scale, not category codes.
 LR_TO_SCORE = {
     "L": -1.0,    # Left
     "C":  0.0,    # Center
@@ -101,22 +88,19 @@ def assign_ideology_scores(G):
 
     PARAMETERS:
         G (networkx.DiGraph): The recommendation graph produced by
-                              build_graph(). Every node is expected to
+                              build_graph() in module 1. Every node 
+                              is expected to
                               have an "LR" attribute, but the function
                               handles nodes that are missing it.
 
     RETURNS:
         networkx.DiGraph: The SAME graph object, now with "IDEOLOGY_SCORE"
                           on every node. The graph is modified IN-PLACE
-                          (we change G itself, not a copy), and is also
-                          returned so callers can chain this call.
+                          (we change G itself, not a copy) since the graph 
+                          is massive in memory size, and is also
+                          returned so callers can chain this call with 
+                          multiple functions.
 
-    WHY IN-PLACE?
-        The graph can be large (~7,000 nodes, ~400,000 edges). Making a
-        deep copy would double memory usage for no benefit, since no part
-        of the pipeline needs to keep the "before scoring" version of the
-        graph. Modifying in-place is both safer (no accidental duplicate
-        objects) and more efficient.
 
     EXAMPLE:
         >>> G = build_graph(nodes_df, edges_df)
@@ -131,9 +115,9 @@ def assign_ideology_scores(G):
 
     # Iterate over every node identifier in the graph.
     # G.nodes returns a NodeView — a collection of all node IDs
-    # (e.g., "ch_L1", "ch_C1", "ch_R1", ...).
-    # We don't need the attribute dictionary on this loop — we access
-    # it below via G.nodes[node_id].
+    
+    # We don't need the attribute dictionary on this loop 
+    # we access it below via G.nodes[node_id].
     for node_id in G.nodes:
 
         # Read the LR label from the node's attribute dictionary.
@@ -141,10 +125,6 @@ def assign_ideology_scores(G):
         # e.g.: {"CHANNEL_TITLE": "Left News 1", "LR": "L", "SUBS": 10000}
         #
         # We use .get("LR") instead of ["LR"] on purpose.
-        # Dictionary access with ["LR"] raises a KeyError if the key is
-        # absent. .get("LR") returns None if the key is missing — safe.
-        # In rare cases a node might have been loaded without an LR column;
-        # we should not crash on those.
         lr_label = G.nodes[node_id].get("LR")
 
         # Look up the numeric score for this label.
@@ -156,8 +136,8 @@ def assign_ideology_scores(G):
         #   - Any other string like "Unknown" → None
         #
         # Returning None for unknown labels is a deliberate choice.
-        # An alternative would be to raise an error (strict) or assign 0.0
-        # (forgiving). We choose None because:
+        #
+        # We choose None because:
         #   - Raises an error: too harsh — the real dataset may have noise.
         #   - Assign 0.0: dangerous — treats unknown as "Center," which
         #     could make averages look more centrist than they are.
@@ -174,7 +154,4 @@ def assign_ideology_scores(G):
     # Because we modified G in-place, the caller's variable already points
     # at the updated graph. Returning it anyway lets you write:
     #   scored_graph = assign_ideology_scores(G)
-    # or even:
-    #   G = assign_ideology_scores(build_graph(...))
-    # Both patterns work cleanly.
     return G

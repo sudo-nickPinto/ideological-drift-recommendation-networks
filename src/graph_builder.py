@@ -79,13 +79,6 @@ def load_nodes(filepath):
     RETURNS:
         pandas.DataFrame: A table where each row is one channel.
 
-    WHY A SEPARATE FUNCTION JUST TO READ A CSV?
-        1. Encapsulation: if we later need to add data cleaning, filtering,
-           or validation when loading nodes, we change it in ONE place.
-        2. Testability: we can test that loading works correctly in isolation
-           before testing graph construction.
-        3. Readability: build_graph() can call load_nodes() instead of
-           having CSV-reading code mixed in with graph-building code.
     """
 
     # pd.read_csv() does all the heavy lifting:

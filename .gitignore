@@ -76,3 +76,6 @@ results/*
 !results/figures/.gitkeep
 !results/tables/.gitkeep
 
+# --- Comprehensive project document (too large for version control) ---
+Ideological Drift in Recommendation Networks.md
+

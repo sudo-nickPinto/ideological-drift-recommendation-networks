@@ -262,16 +262,9 @@ def plot_drift_distribution(trajectories, output_path):
 		)
 		ax.legend(fontsize=11)
 
-		# Plain-English interpretation for non-technical readers.
+		# Plain-English caption placed below the chart.
 		direction = "leftward" if mean_drift < 0 else "rightward" if mean_drift > 0 else "neither direction"
-		ax.text(
-			0.97, 0.95,
-			f"Bottom Line: On average,\nusers drifted {direction}\nby {abs(mean_drift):.2f} points.",
-			transform=ax.transAxes,
-			ha="right", va="top",
-			fontsize=10,
-			bbox=dict(boxstyle="round,pad=0.4", facecolor="lightyellow", edgecolor="gray"),
-		)
+		caption = f"Bottom Line: On average, users drifted {direction} by {abs(mean_drift):.2f} points."
 	else:
 		# If there are no valid drifts, show a message instead of an empty plot.
 		ax.text(
@@ -287,6 +280,9 @@ def plot_drift_distribution(trajectories, output_path):
 	ax.set_title("Which Direction Do Users Drift?", fontsize=14)
 
 	fig.tight_layout()
+	if drifts:
+		fig.subplots_adjust(bottom=0.14)
+		fig.text(0.5, 0.02, caption, ha="center", fontsize=10, style="italic")
 	fig.savefig(output_path, dpi=150)
 	plt.close(fig)
 
@@ -361,20 +357,13 @@ def plot_trajectory_sample(trajectories, output_path, max_lines=20):
 	ax.set_ylim(-1.3, 1.3)  # Slight padding beyond the score range.
 	ax.legend(loc="upper right", fontsize=9)
 
-	# Interpretive text box so the audience knows how to read the chart.
-	ax.text(
-		0.03, 0.05,
-		"Each line = one simulated user\nfollowing recommendations.\n"
-		"Flat lines = stuck in one area.\n"
-		"Jagged lines = bouncing around.",
-		transform=ax.transAxes,
-		ha="left", va="bottom",
-		fontsize=9,
-		bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow",
-		          edgecolor="gray", alpha=0.9),
-	)
+	# Caption placed below the chart so it doesn't block trajectory lines.
+	caption = ("Each line = one simulated user following recommendations. "
+	           "Flat lines = stuck in one area. Jagged lines = bouncing around.")
 
 	fig.tight_layout()
+	fig.subplots_adjust(bottom=0.14)
+	fig.text(0.5, 0.02, caption, ha="center", fontsize=10, style="italic")
 	fig.savefig(output_path, dpi=150)
 	plt.close(fig)
 
@@ -428,21 +417,13 @@ def plot_extremity_distribution(trajectories, output_path):
 		)
 		ax.legend(fontsize=11)
 
-		# Plain-English interpretation.
+		# Plain-English caption placed below the chart.
 		if mean_change > 0:
-			verdict = "users ended FARTHER\nfrom center (more extreme)"
+			caption = "Bottom Line: users ended FARTHER from center (more extreme)."
 		elif mean_change < 0:
-			verdict = "users ended CLOSER\nto center (less extreme)"
+			caption = "Bottom Line: users ended CLOSER to center (less extreme)."
 		else:
-			verdict = "no net change\nin extremity"
-		ax.text(
-			0.97, 0.95,
-			f"Bottom Line:\n{verdict}",
-			transform=ax.transAxes,
-			ha="right", va="top",
-			fontsize=10,
-			bbox=dict(boxstyle="round,pad=0.4", facecolor="lightyellow", edgecolor="gray"),
-		)
+			caption = "Bottom Line: no net change in extremity."
 	else:
 		ax.text(
 			0.5, 0.5,
@@ -457,6 +438,9 @@ def plot_extremity_distribution(trajectories, output_path):
 	ax.set_title("Do Users End Up at More Extreme Content?", fontsize=14)
 
 	fig.tight_layout()
+	if extremity_changes:
+		fig.subplots_adjust(bottom=0.14)
+		fig.text(0.5, 0.02, caption, ha="center", fontsize=10, style="italic")
 	fig.savefig(output_path, dpi=150)
 	plt.close(fig)
 
@@ -565,18 +549,9 @@ def plot_null_model_comparison(real_extremity, null_extremities, p_value, output
 	# Plain-English explanation of the p-value so a non-technical
 	# audience can immediately understand the takeaway.
 	if p_value < 0.05:
-		verdict = "Statistically significant —\nthis pattern is unlikely\nto be coincidence."
+		caption = f"p-value = {p_value:.2f} — Statistically significant: this pattern is unlikely to be coincidence."
 	else:
-		verdict = "Not statistically significant —\nthis pattern could happen\nby chance alone."
-	ax.text(
-		0.97, 0.95,
-		f"p-value = {p_value:.2f}\n\n{verdict}",
-		transform=ax.transAxes,
-		ha="right", va="top",
-		fontsize=11,
-		fontweight="bold",
-		bbox=dict(boxstyle="round,pad=0.4", facecolor="lightyellow", edgecolor="gray"),
-	)
+		caption = f"p-value = {p_value:.2f} — Not statistically significant: this pattern could happen by chance alone."
 
 	ax.set_xlabel("Extremity Change From Shuffled Labels (the \"placebo\")", fontsize=11)
 	ax.set_ylabel("Number of Shuffled Trials", fontsize=12)
@@ -584,6 +559,8 @@ def plot_null_model_comparison(real_extremity, null_extremities, p_value, output
 	ax.legend(fontsize=10)
 
 	fig.tight_layout()
+	fig.subplots_adjust(bottom=0.14)
+	fig.text(0.5, 0.02, caption, ha="center", fontsize=10, style="italic")
 	fig.savefig(output_path, dpi=150)
 	plt.close(fig)
 
@@ -693,16 +670,14 @@ def plot_recommendation_vs_random(rec_summary, random_summary, output_path):
 	rand_drift_val = random_values[0]
 	if rand_drift_val > 0:
 		pct_diff = (rec_drift_val - rand_drift_val) / rand_drift_val * 100
-		ax.text(
-			0.97, 0.95,
-			f"Bottom Line: Recommendations\ncause {abs(pct_diff):.0f}% {'more' if pct_diff > 0 else 'less'} drift\nthan random browsing.",
-			transform=ax.transAxes,
-			ha="right", va="top",
-			fontsize=10,
-			bbox=dict(boxstyle="round,pad=0.4", facecolor="lightyellow", edgecolor="gray"),
-		)
+		caption = f"Bottom Line: Recommendations cause {abs(pct_diff):.0f}% {'more' if pct_diff > 0 else 'less'} drift than random browsing."
+	else:
+		caption = None
 
 	fig.tight_layout()
+	if caption:
+		fig.subplots_adjust(bottom=0.14)
+		fig.text(0.5, 0.02, caption, ha="center", fontsize=10, style="italic")
 	fig.savefig(output_path, dpi=150)
 	plt.close(fig)
 
@@ -777,18 +752,11 @@ def plot_steps_to_extreme(steps_list, median_val, pct_reaching, output_path):
 			annotation_parts.append(f"{pct_reaching * 100:.1f}% of walks\nreached extreme")
 		annotation_text = "\n".join(annotation_parts)
 
-		ax.text(
-			0.97, 0.95,
-			annotation_text,
-			transform=ax.transAxes,
-			ha="right", va="top",
-			fontsize=12,
-			fontweight="bold",
-			bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow", edgecolor="gray"),
-		)
+		caption = annotation_text.replace("\n", " \u00b7 ")
 
 		ax.legend(fontsize=10)
 	else:
+		caption = None
 		ax.text(
 			0.5, 0.5,
 			"No walks reached extreme content",
@@ -802,6 +770,9 @@ def plot_steps_to_extreme(steps_list, median_val, pct_reaching, output_path):
 	ax.set_title("How Many Clicks to Reach Extreme Content?", fontsize=14)
 
 	fig.tight_layout()
+	if caption:
+		fig.subplots_adjust(bottom=0.14)
+		fig.text(0.5, 0.02, caption, ha="center", fontsize=10, style="italic")
 	fig.savefig(output_path, dpi=150)
 	plt.close(fig)
 

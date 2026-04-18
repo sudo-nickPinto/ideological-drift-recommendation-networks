@@ -75,3 +75,7 @@ results/*
 # Keep .gitkeep files so the directory structure is preserved.
 !results/figures/.gitkeep
 !results/tables/.gitkeep
+
+# --- Internal documents ---
+# Onboarding guide is for internal use only; not tracked in the public repo.
+docs/ONBOARDING_GUIDE.md

@@ -49,6 +49,9 @@ from src.visualize import (
 	plot_drift_distribution,
 	plot_extremity_distribution,
 	plot_ideology_distribution,
+	plot_null_model_comparison,
+	plot_recommendation_vs_random,
+	plot_steps_to_extreme,
 	plot_trajectory_sample,
 	save_metrics_table,
 )
@@ -225,55 +228,50 @@ def test_plot_extremity_distribution_creates_file(sample_trajectories, tmp_path)
 
 # --- TESTS: save_metrics_table() ---------------------------------------------
 
-def test_save_metrics_table_creates_file(sample_metrics, tmp_path):
+def test_save_metrics_table_creates_file(tmp_path):
 	"""
-	WHAT: Call save_metrics_table() with a sample metrics dictionary.
+	WHAT: Call save_metrics_table() with sample rows.
 	EXPECT: A CSV file appears at the specified output path.
 	"""
+	rows = [
+		("Simulated user journeys", "3", "Number of random walks"),
+		("Average drift", "+0.67", "Users drifted rightward"),
+	]
 	output_path = str(tmp_path / "summary_metrics.csv")
-	save_metrics_table(sample_metrics, output_path)
+	save_metrics_table(rows, output_path)
 	assert os.path.isfile(output_path), "CSV file was not created."
 
 
-def test_save_metrics_table_content(sample_metrics, tmp_path):
+def test_save_metrics_table_content(tmp_path):
 	"""
 	WHAT: Write a metrics table, read it back, and verify the values.
-	EXPECT: The CSV header matches the expected column names and the
-	        data row contains the correct values.
+	EXPECT: The CSV has a 3-column header (Metric, Value, What It Means)
+	        and each data row matches the input.
 	WHY: This is the one visualization output where we CAN verify content
 	     precisely — it's just text, not pixels.
 	"""
+	rows = [
+		("Simulated user journeys", "3", "Number of random walks"),
+		("Average drift", "+0.67", "Users drifted rightward"),
+	]
 	output_path = str(tmp_path / "summary_metrics.csv")
-	save_metrics_table(sample_metrics, output_path)
+	save_metrics_table(rows, output_path)
 
 	# Read the CSV back.
 	with open(output_path, "r") as csvfile:
 		reader = csv.reader(csvfile)
-		rows = list(reader)
+		read_rows = list(reader)
 
-	# Row 0 = header, Row 1 = data.
-	assert len(rows) == 2, "CSV should have exactly 2 rows (header + data)."
+	# Row 0 = header, Rows 1+ = data.
+	assert len(read_rows) == 3, "CSV should have 1 header + 2 data rows."
 
-	header = rows[0]
-	data = rows[1]
+	# Verify header.
+	assert read_rows[0] == ["Metric", "Value", "What It Means"]
 
-	# Verify header matches expected column order.
-	expected_header = [
-		TRAJECTORY_COUNT_FIELD,
-		VALID_DRIFT_COUNT_FIELD,
-		MEAN_DRIFT_FIELD,
-		MEAN_ABSOLUTE_DRIFT_FIELD,
-		MEAN_EXTREMITY_CHANGE_FIELD,
-		ASSORTATIVITY_FIELD,
-		CLUSTERING_FIELD,
-	]
-	assert header == expected_header, f"Header mismatch: {header}"
-
-	# Verify data values.
-	# CSV stores everything as strings, so we compare string representations.
-	assert data[0] == str(sample_metrics[TRAJECTORY_COUNT_FIELD])
-	assert data[1] == str(sample_metrics[VALID_DRIFT_COUNT_FIELD])
-	assert data[2] == str(sample_metrics[MEAN_DRIFT_FIELD])
+	# Verify first data row.
+	assert read_rows[1][0] == "Simulated user journeys"
+	assert read_rows[1][1] == "3"
+	assert read_rows[1][2] == "Number of random walks"
 
 
 # --- TESTS: generate_all_figures() -------------------------------------------
@@ -309,3 +307,148 @@ def test_generate_all_figures_creates_all_files(
 	# Check the metrics table.
 	table_path = os.path.join(output_dir, "tables", "summary_metrics.csv")
 	assert os.path.isfile(table_path), "Missing metrics table CSV."
+
+
+# ==============================================================================
+# TESTS — NEW CHART FUNCTIONS (Enhancement Phase)
+# ==============================================================================
+#
+# These tests verify the three new charts that strengthen the experiment.
+# As with the original chart tests, we use SMOKE TESTS: does the function
+# run without crashing and produce a PNG file?
+#
+# ==============================================================================
+
+
+def test_plot_null_model_comparison_creates_file(tmp_path):
+	"""
+	WHAT: Call plot_null_model_comparison() with synthetic data.
+	EXPECT: A PNG file appears at the specified output path.
+
+	WHY: This chart shows whether the real extremity change is
+	     statistically significant compared to shuffled-label trials.
+	"""
+	output_path = str(tmp_path / "null_model_comparison.png")
+	plot_null_model_comparison(
+		real_extremity=0.19,
+		null_extremities=[0.02, 0.03, 0.01, 0.04, 0.02, 0.05, 0.03, 0.01, 0.04, 0.02],
+		p_value=0.02,
+		output_path=output_path,
+	)
+	assert os.path.isfile(output_path), "PNG file was not created."
+
+
+def test_plot_recommendation_vs_random_creates_file(tmp_path):
+	"""
+	WHAT: Call plot_recommendation_vs_random() with two summary dicts.
+	EXPECT: A PNG file appears at the specified output path.
+
+	WHY: This chart compares recommendation-following to random browsing.
+	"""
+	from src.metrics import MEAN_ABSOLUTE_DRIFT_FIELD, MEAN_EXTREMITY_CHANGE_FIELD, EXTREME_HIT_RATE_FIELD
+
+	rec_summary = {
+		MEAN_ABSOLUTE_DRIFT_FIELD: 0.96,
+		MEAN_EXTREMITY_CHANGE_FIELD: 0.19,
+		EXTREME_HIT_RATE_FIELD: 0.85,
+	}
+	random_summary = {
+		MEAN_ABSOLUTE_DRIFT_FIELD: 0.45,
+		MEAN_EXTREMITY_CHANGE_FIELD: 0.05,
+		EXTREME_HIT_RATE_FIELD: 0.40,
+	}
+
+	output_path = str(tmp_path / "recommendation_vs_random.png")
+	plot_recommendation_vs_random(rec_summary, random_summary, output_path)
+	assert os.path.isfile(output_path), "PNG file was not created."
+
+
+def test_plot_steps_to_extreme_creates_file(tmp_path):
+	"""
+	WHAT: Call plot_steps_to_extreme() with a list of step counts.
+	EXPECT: A PNG file appears at the specified output path.
+
+	WHY: This chart shows how quickly users reach extreme content.
+	"""
+	output_path = str(tmp_path / "steps_to_extreme.png")
+	plot_steps_to_extreme(
+		steps_list=[1, 2, 3, 2, 1, 4, 3, 2, 5, 1],
+		median_val=2.0,
+		pct_reaching=0.85,
+		output_path=output_path,
+	)
+	assert os.path.isfile(output_path), "PNG file was not created."
+
+
+def test_plot_steps_to_extreme_handles_empty_list(tmp_path):
+	"""
+	WHAT: Call plot_steps_to_extreme() with an empty list.
+	EXPECT: A PNG file is still created (with a "no data" message).
+
+	WHY: Edge case — if no walks reached extreme content, the function
+	     should not crash.
+	"""
+	output_path = str(tmp_path / "steps_empty.png")
+	plot_steps_to_extreme(
+		steps_list=[],
+		median_val=None,
+		pct_reaching=0.0,
+		output_path=output_path,
+	)
+	assert os.path.isfile(output_path), "PNG file was not created for empty input."
+
+
+def test_generate_all_figures_creates_new_files_when_data_provided(
+	scored_graph, sample_trajectories, sample_metrics, tmp_path
+):
+	"""
+	WHAT: Call generate_all_figures() with all new optional parameters.
+	EXPECT: The three new PNGs appear alongside the original four.
+
+	WHY: This is the integration test for backward-compatible enhancement.
+	     The original four figures should still be created, AND the three
+	     new figures should also appear when their data is provided.
+	"""
+	from src.metrics import MEAN_ABSOLUTE_DRIFT_FIELD, MEAN_EXTREMITY_CHANGE_FIELD, EXTREME_HIT_RATE_FIELD
+
+	output_dir = str(tmp_path / "results")
+
+	rec_summary = {
+		MEAN_ABSOLUTE_DRIFT_FIELD: 0.96,
+		MEAN_EXTREMITY_CHANGE_FIELD: 0.19,
+		EXTREME_HIT_RATE_FIELD: 0.85,
+	}
+	random_summary = {
+		MEAN_ABSOLUTE_DRIFT_FIELD: 0.45,
+		MEAN_EXTREMITY_CHANGE_FIELD: 0.05,
+		EXTREME_HIT_RATE_FIELD: 0.40,
+	}
+
+	generate_all_figures(
+		scored_graph,
+		sample_trajectories,
+		sample_metrics,
+		output_dir=output_dir,
+		null_extremities=[0.02, 0.03, 0.01, 0.04, 0.05],
+		null_p_value=0.02,
+		real_extremity=0.19,
+		rec_summary=rec_summary,
+		random_summary=random_summary,
+		steps_to_extreme_data={
+			"steps_list": [1, 2, 3, 2, 1],
+			"median": 2.0,
+			"pct_reaching": 0.80,
+		},
+	)
+
+	# Original figures should still exist.
+	for filename in ["ideology_distribution.png", "drift_distribution.png",
+					 "trajectory_sample.png", "extremity_distribution.png"]:
+		filepath = os.path.join(output_dir, "figures", filename)
+		assert os.path.isfile(filepath), f"Missing original figure: {filename}"
+
+	# New figures should also exist.
+	for filename in ["null_model_comparison.png", "recommendation_vs_random.png",
+					 "steps_to_extreme.png"]:
+		filepath = os.path.join(output_dir, "figures", filename)
+		assert os.path.isfile(filepath), f"Missing new figure: {filename}"

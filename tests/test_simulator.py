@@ -52,6 +52,8 @@ from src.simulator import (
 	choose_next_node,
 	simulate_walk,
 	simulate_walks,
+	simulate_walk_uniform,
+	simulate_walks_uniform,
 )
 
 
@@ -293,3 +295,91 @@ def test_default_weight_attribute_constant_matches_graph_builder_schema():
 		 the real edge weights and produce wrong random-walk behavior.
 	"""
 	assert DEFAULT_WEIGHT_ATTRIBUTE == "RELEVANT_IMPRESSIONS_DAILY"
+
+
+# ==============================================================================
+# TESTS — simulate_walk_uniform()
+# ==============================================================================
+#
+# The "uniform" walk is a CONTROL EXPERIMENT. Instead of following
+# recommendation edges (which the real YouTube algorithm would produce),
+# the walker teleports to a RANDOM scored node at every step.
+#
+# If following recommendations causes more drift than random browsing,
+# that proves the recommendation structure is responsible for the drift.
+#
+# ==============================================================================
+
+
+def test_simulate_walk_uniform_picks_any_node(scored_graph):
+	"""
+	WHAT: A uniform walk should produce a trajectory with the correct format:
+	      each step has STEP_FIELD, NODE_FIELD, and SCORE_FIELD.
+
+	WHY: Even though the walk ignores edges, the trajectory format must
+	     match the recommendation walk format so metrics.py can process
+	     both types identically.
+	"""
+	trajectory = simulate_walk_uniform(
+		scored_graph,
+		start_node="ch_L1",
+		num_steps=5,
+		rng=random.Random(42),
+	)
+
+	# Walk should have num_steps + 1 records (start node + 5 steps).
+	assert len(trajectory) == 6, f"Expected 6 records, got {len(trajectory)}."
+
+	# Every record should contain the three required fields.
+	for record in trajectory:
+		assert STEP_FIELD in record, "Missing step field."
+		assert NODE_FIELD in record, "Missing node_id field."
+		assert SCORE_FIELD in record, "Missing ideology_score field."
+
+	# Step numbers should be sequential: 0, 1, 2, 3, 4, 5.
+	steps = [record[STEP_FIELD] for record in trajectory]
+	assert steps == list(range(6)), f"Steps should be 0..5, got {steps}."
+
+	# The start node should be the one we passed in.
+	assert trajectory[0][NODE_FIELD] == "ch_L1"
+
+
+def test_simulate_walk_uniform_ignores_edges(scored_graph):
+	"""
+	WHAT: An isolated node (ch_island has no outgoing edges) should still
+	      complete a full uniform walk — because uniform walk picks from
+	      ALL scored nodes, not from neighbors.
+
+	WHY: This is the key difference between the recommendation walk and
+	     the random baseline. The recommendation walk stops at dead ends;
+	     the uniform walk cannot get stuck.
+	"""
+	trajectory = simulate_walk_uniform(
+		scored_graph,
+		start_node="ch_island",
+		num_steps=5,
+		rng=random.Random(42),
+	)
+
+	# Should NOT stop early. Full length = 6 records.
+	assert len(trajectory) == 6, (
+		f"Uniform walk should never stop early. Expected 6 records, got {len(trajectory)}."
+	)
+
+
+def test_simulate_walks_uniform_returns_correct_count(scored_graph):
+	"""
+	WHAT: 2 start nodes × 2 walks each = 4 trajectories total.
+
+	WHY: This verifies the outer loop logic of the batch wrapper,
+	     matching the same interface as simulate_walks().
+	"""
+	trajectories = simulate_walks_uniform(
+		scored_graph,
+		start_nodes=["ch_L1", "ch_R1"],
+		num_steps=3,
+		walks_per_start=2,
+		rng=random.Random(42),
+	)
+
+	assert len(trajectories) == 4, f"Expected 4 trajectories, got {len(trajectories)}."

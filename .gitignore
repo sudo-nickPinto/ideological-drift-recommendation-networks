@@ -76,6 +76,3 @@ results/*
 !results/figures/.gitkeep
 !results/tables/.gitkeep
 
-# --- Internal documents ---
-# Onboarding guide is for internal use only; not tracked in the public repo.
-docs/ONBOARDING_GUIDE.md

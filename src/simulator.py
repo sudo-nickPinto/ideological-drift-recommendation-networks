@@ -286,3 +286,176 @@ def simulate_walks(
 			all_trajectories.append(trajectory)
 
 	return all_trajectories
+
+
+# ==============================================================================
+# RANDOM-BROWSING BASELINE
+# ==============================================================================
+#
+# WHY DO WE NEED A "RANDOM BROWSING" MODE?
+#
+#   The main experiment shows that following recommendations produces
+#   ideological drift. But a skeptic could ask:
+#
+#       "Maybe ANY movement through this network causes drift, even without
+#        recommendations. The network just has more Right channels, so
+#        you'll drift no matter what."
+#
+#   To test this, we simulate a user who IGNORES recommendations entirely
+#   and instead picks a completely random channel at each step. If this
+#   "random browsing" produces the SAME amount of drift as following
+#   recommendations, then recommendations are not the cause — the network
+#   composition alone explains everything.
+#
+#   But if following recommendations produces MORE drift than random
+#   browsing, that proves the recommendation edges specifically amplify
+#   ideological movement beyond what network composition alone would do.
+#
+#   This is called a BASELINE COMPARISON in experimental design: you need
+#   a "control group" to know whether your "treatment group" is special.
+#
+# WHY A SEPARATE FUNCTION INSTEAD OF A MODE PARAMETER?
+#   Keeping the logic in its own function keeps each function simple and
+#   testable. No if/else branching inside the hot loop. This matches the
+#   project's philosophy of small, single-purpose functions.
+#
+# ==============================================================================
+
+
+def simulate_walk_uniform(
+	G,
+	start_node,
+	num_steps,
+	rng=None,
+	score_attr=SCORE_ATTRIBUTE,
+):
+	"""
+	Run one UNIFORM random walk — picking any random scored node at each step.
+
+	HOW THIS DIFFERS FROM simulate_walk():
+		simulate_walk() follows RECOMMENDATION EDGES: the walker can only
+		move to channels that YouTube actually recommends from the current
+		channel, weighted by how often that recommendation appears.
+
+		simulate_walk_uniform() IGNORES EDGES entirely. At each step, the
+		walker jumps to a randomly chosen channel from the entire network.
+		This simulates a user who is browsing YouTube randomly, NOT following
+		any recommendations at all.
+
+	WHY THIS MATTERS:
+		If random browsing produces the same drift as following
+		recommendations, then the drift is caused by the network's
+		composition (more Right channels = more Right encounters).
+		If following recommendations produces MORE drift, then the
+		recommendation edges specifically amplify ideological movement.
+
+	PARAMETERS:
+		G (networkx.DiGraph): The scored recommendation graph.
+		start_node: Node where the walk begins. Must exist in the graph.
+		num_steps (int): Number of random jumps to make.
+		rng (random.Random or None): Random number generator.
+		score_attr (str): Node attribute holding ideology score.
+
+	RETURNS:
+		list[dict]: Trajectory records, same format as simulate_walk().
+
+	RAISES:
+		ValueError: If start_node is not in the graph or num_steps < 0.
+	"""
+	if start_node not in G:
+		raise ValueError(f"Start node '{start_node}' is not in the graph.")
+
+	if num_steps < 0:
+		raise ValueError("num_steps must be 0 or greater.")
+
+	if rng is None:
+		rng = random.Random()
+
+	# Pre-compute the list of all nodes that have a valid ideology score.
+	# We only jump to scored nodes so that every step produces a usable
+	# ideology score for metrics. Jumping to an unscored node would create
+	# None values that break drift calculations.
+	scored_nodes = [
+		node_id
+		for node_id, attrs in G.nodes(data=True)
+		if attrs.get(score_attr) is not None
+	]
+
+	# If no nodes have scores, we cannot do anything useful.
+	if not scored_nodes:
+		raise ValueError("Graph has no nodes with valid ideology scores.")
+
+	# Record the starting position as step 0, same as simulate_walk().
+	current_node = start_node
+	trajectory = [
+		{
+			STEP_FIELD: 0,
+			NODE_FIELD: current_node,
+			SCORE_FIELD: G.nodes[current_node].get(score_attr),
+		}
+	]
+
+	# At each step, jump to a random scored node in the ENTIRE graph.
+	# Unlike simulate_walk(), there is no dead-end problem here because
+	# we are not following edges — we can always pick a random node.
+	for step_number in range(1, num_steps + 1):
+		current_node = rng.choice(scored_nodes)
+		trajectory.append(
+			{
+				STEP_FIELD: step_number,
+				NODE_FIELD: current_node,
+				SCORE_FIELD: G.nodes[current_node].get(score_attr),
+			}
+		)
+
+	return trajectory
+
+
+def simulate_walks_uniform(
+	G,
+	start_nodes,
+	num_steps,
+	walks_per_start=1,
+	rng=None,
+	score_attr=SCORE_ATTRIBUTE,
+):
+	"""
+	Run multiple UNIFORM random walks from one or more starting nodes.
+
+	This is the uniform-walk counterpart of simulate_walks(). It uses
+	simulate_walk_uniform() instead of simulate_walk(), so each step
+	picks a random node from the entire graph instead of following
+	recommendation edges.
+
+	PARAMETERS:
+		G (networkx.DiGraph): The scored recommendation graph.
+		start_nodes (iterable): Collection of starting node IDs.
+		num_steps (int): Number of random jumps per walk.
+		walks_per_start (int): How many walks to run from each start node.
+		rng (random.Random or None): Random number generator.
+		score_attr (str): Node attribute holding ideology score.
+
+	RETURNS:
+		list[list[dict]]: A list of trajectories, same format as
+		simulate_walks().
+	"""
+	if walks_per_start <= 0:
+		raise ValueError("walks_per_start must be at least 1.")
+
+	if rng is None:
+		rng = random.Random()
+
+	all_trajectories = []
+
+	for start_node in start_nodes:
+		for _ in range(walks_per_start):
+			trajectory = simulate_walk_uniform(
+				G,
+				start_node,
+				num_steps,
+				rng=rng,
+				score_attr=score_attr,
+			)
+			all_trajectories.append(trajectory)
+
+	return all_trajectories

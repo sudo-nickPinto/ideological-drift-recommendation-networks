@@ -11,7 +11,7 @@ The implemented system is intentionally small and modular because the research p
 3. Attach ideology scores to nodes.
 4. Simulate recommendation-following behavior.
 5. Compute interpretable drift and network metrics.
-6. Generate figures and a summary table.
+6. Generate figures and summary tables.
 
 That order matters. Each stage produces the exact structure the next stage needs, which keeps the code easy to test and easy to explain.
 
@@ -118,6 +118,7 @@ Implemented public functions:
 - `compute_mean_extremity_change(...)`
 - `compute_ideology_assortativity(...)`
 - `compute_average_clustering(...)`
+- `compute_graph_metrics(...)`
 - `compute_all_metrics(...)`
 
 Why this module exists:
@@ -132,6 +133,7 @@ Implemented metric behavior:
 - Summary functions skip invalid trajectories instead of inventing fallback values.
 - Assortativity filters out nodes with missing ideology scores before calling NetworkX.
 - Clustering is computed on an undirected copy of the graph for a simpler and more teachable interpretation.
+- Repeated experiment runs can reuse precomputed graph-only metrics instead of recalculating them for every trajectory batch.
 
 `compute_all_metrics()` packages results under the field names that downstream CSV output expects:
 
@@ -154,6 +156,7 @@ Implemented public functions:
 - `plot_trajectory_sample(trajectories, output_path, max_lines=20)`
 - `plot_extremity_distribution(trajectories, output_path)`
 - `save_metrics_table(metrics_dict, output_path)`
+- `save_rows_table(rows, output_path, fieldnames)`
 - `generate_all_figures(G, trajectories, metrics_dict, output_dir="results")`
 
 Why this module also covers reporting:
@@ -167,6 +170,7 @@ Key implementation choices:
 - Uses the Matplotlib `Agg` backend so plots can be generated without a display.
 - Uses seaborn styling for readable defaults.
 - Writes local artifacts into `results/figures/` and `results/tables/`.
+- Clears stale image files before writing a new baseline figure bundle, while preserving older CSV tables unless a run overwrites a specific filename.
 - Closes figures after saving to avoid memory buildup.
 
 ### 6. Orchestration and Runnable Script
@@ -195,6 +199,34 @@ Default orchestration behavior:
 - Runs deterministic walks with a fixed random seed
 - Writes outputs to `results/`
 
+Implemented run modes:
+
+- `baseline`
+  Runs the original single simulation path and refreshes the four baseline PNGs plus `summary_metrics.csv`.
+- `experiment`
+  Runs the same baseline pass first, then repeats the simulation across three start policies, four step counts, and multiple seeds before writing three experiment CSV tables plus two experiment-summary PNG figures. Its CLI summary also switches to experiment-level headline metrics so the repeated run is not reported as if it were just the baseline pass again.
+
+Current repeated-experiment volume controls:
+
+- `5` walks per selected start node
+- `5` seeds per configuration family
+- up to `900` selected start nodes per policy
+
+The repeated run also exposes a live CLI dashboard while the simulator is
+working so long experiment launches do not look frozen in the terminal.
+
+The repeated experiment is still centered on the same two audience-facing
+questions:
+
+- Does the network tend to push users left or right overall?
+- Does the network tend to push users farther from the ideological center?
+
+Experiment-mode start policies:
+
+- `all_valid`: every node that passes the normal valid-start rule
+- `center_only`: valid starts whose ideology score is exactly `0.0`
+- `ideology_balanced`: equal-sized Left, Center, and Right samples based on the smallest ideology bucket
+
 ## Data Flow
 
 The implemented data flow is:
@@ -206,7 +238,8 @@ CSV files
   -> scored graph with IDEOLOGY_SCORE on nodes
   -> simulated trajectories
   -> drift and structural metrics
-  -> PNG figures + one-row CSV summary
+  -> PNG figures + baseline CSV summary
+  -> optional repeated-experiment PNG summaries + CSV summaries
 ```
 
 The design stays local and in-memory. There is no database, API server, message queue, or front-end application because the current project does not need them. The workload is a research pipeline over a static dataset, so keeping everything in Python objects is the most direct and least fragile option.
@@ -229,7 +262,7 @@ The repository layout that exists today is:
 | `tests/test_simulator.py` | Validates weighted selection, dead ends, trajectory shape, and input checks |
 | `tests/test_metrics.py` | Validates formulas, graph metrics, and packaged summaries |
 | `tests/test_visualize.py` | Smoke-tests file generation and CSV content |
-| `tests/test_run_pipeline.py` | Smoke-tests the one-command orchestration layer |
+| `tests/test_run_pipeline.py` | Smoke-tests the orchestration layer for baseline mode, experiment mode, and cleanup behavior |
 | `tests/fixtures/` | Synthetic test CSVs used across the suite |
 | `data/README.md` | Dataset provenance and schema notes |
 | `results/` | Local output destination for generated artifacts |
@@ -245,7 +278,7 @@ The test suite is organized around the same pipeline order as the code.
 - `test_simulator.py` checks dead-end handling, forced-choice paths, bad inputs, weight overrides, and multi-walk output structure.
 - `test_metrics.py` checks exact hand-computed drift formulas, summary math, assortativity edge cases, clustering, and summary-field contracts.
 - `test_visualize.py` checks that figures and CSV outputs are created successfully, and that the summary CSV content matches expected keys and values.
-- `test_run_pipeline.py` checks the scored-graph preparation step, default start-node selection, full output generation, and the failure mode when no valid start nodes exist.
+- `test_run_pipeline.py` checks the scored-graph preparation step, default start-node selection, baseline output generation, experiment-mode table and figure generation, experiment-summary reporting, stale-image cleanup, and the failure mode when no valid start nodes exist.
 
 ### Why the tests use synthetic fixtures
 
@@ -258,6 +291,9 @@ That gives three benefits:
 3. A failing test points to a logic bug rather than a data acquisition problem.
 
 ### Focused validation commands
+
+The commands below assume the project virtual environment is already active
+with `source .venv/bin/activate`.
 
 The narrow current validation commands are:
 
@@ -293,7 +329,7 @@ The implemented stack is intentionally conservative and research-friendly.
 
 To avoid stale expectations, these are not implemented right now:
 
-- No web application, dashboard, or API.
+- No web application, browser dashboard, or API.
 - No live scraping or streaming ingestion.
 - No committed generated output artifacts from the real dataset.
 - No separate reporting module beyond the figure and CSV helpers in `visualize.py`.

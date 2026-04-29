@@ -4,9 +4,12 @@ Graph-based analysis code for studying whether a recommendation network can move
 
 ## What This Repository Does
 
-The project uses the Recfluence YouTube recommendation dataset to model channels as nodes, recommendations as directed edges, and channel ideology as a numeric score. The implemented pipeline then simulates weighted recommendation-following behavior, computes drift and structural metrics, and generates figures plus a summary table.
+The project uses the Recfluence YouTube recommendation dataset to model channels as nodes, recommendations as directed edges, and channel ideology as a numeric score. The implemented pipeline then simulates weighted recommendation-following behavior, computes drift and structural metrics, and generates figures plus summary tables.
 
-The core research question is simple: if a user keeps clicking recommended political content, does the network structure itself tend to move that user farther from the ideological center?
+The current presentation-facing questions are simple:
+
+1. Do recommendation paths tend to change ideology direction overall?
+2. Do recommendation paths tend to increase ideological extremity?
 
 ## Current Status
 
@@ -36,7 +39,7 @@ The analysis flow in the codebase is:
 4. `metrics.py`
    Computes per-walk drift, extremity change, mean summaries, ideology assortativity, average clustering, and a packaged metrics dictionary.
 5. `visualize.py`
-   Writes four figures plus a one-row summary CSV from the graph, trajectories, and metrics.
+   Writes the baseline figure bundle and CSV tables from the graph, trajectories, and metrics.
 
 This modular order matters because each stage assumes the previous one has already prepared the required inputs. For example, the simulator expects ideology scores to already be attached to nodes, and the metrics module expects walk trajectories in the simulator's step-record format.
 
@@ -105,7 +108,48 @@ Optional flags:
 python3 run.py --num-steps 15 --walks-per-start 2 --seed 123
 ```
 
+## Two Run Modes
+
+The same entrypoint supports two workflows:
+
+1. Baseline mode
+   This is the default. It runs one deterministic simulation using the current
+   start-node rule and writes the familiar four PNG figures plus
+   `results/tables/summary_metrics.csv`.
+2. Experiment mode
+   This first refreshes the baseline bundle, then runs a repeated experiment
+   across three start policies, four step counts, and multiple seeds to make
+   the two headline questions more defensible. It also writes two
+   experiment-specific summary PNGs and prints experiment-level headline
+   numbers in the terminal so the repeated run does not look identical to the
+   baseline pass.
+
+Use experiment mode like this:
+
+```bash
+python3 run.py --mode experiment
+```
+
+The repeated experiment keeps the ideology metric formulas unchanged. It varies:
+
+- Start policy: current valid starts, center-only starts, ideology-balanced starts
+- Steps per walk: `1`, `5`, `10`, `20`
+- Walks per start: `5`
+- Seeds: `5`
+- Start-node cap per policy: `900`
+
+In experiment mode, the baseline CLI flags `--num-steps`, `--walks-per-start`,
+and `--seed` still control the baseline refresh pass. The repeated experiment
+uses its fixed matrix inside `src/run_pipeline.py`.
+
+When you launch experiment mode from a real terminal, the CLI now shows a live
+simulation dashboard with a progress bar, current configuration number, start
+group, seed, steps per walk, and selected-start counts.
+
 ## Validation
+
+The commands below assume the project virtual environment is already active
+with `source .venv/bin/activate`.
 
 The narrowest routine checks in this repository are the module-level pytest files.
 
@@ -130,7 +174,21 @@ python3 -m pytest -v
 - `results/figures/drift_distribution.png`
 - `results/figures/trajectory_sample.png`
 - `results/figures/extremity_distribution.png`
+- `results/figures/experiment_signed_drift_summary.png`
+- `results/figures/experiment_extremity_change_summary.png`
 - `results/tables/summary_metrics.csv`
+- `results/tables/experiment_per_run.csv`
+- `results/tables/experiment_grouped_summary.csv`
+- `results/tables/presentation_headline_metrics.csv`
+
+Repeated runs automatically delete stale image files from `results/` and
+`results/figures/` before writing the current PNG bundle. Existing CSV tables
+in `results/tables/` are preserved unless a run overwrites a specific file.
+
+The presentation table is intentionally plain English. It focuses only on:
+
+- signed ideological drift: whether the network tends to push users left or right overall
+- extremity change: whether walks tend to end farther from or closer to the center
 
 Those outputs are intentionally untracked because they are regenerable from code plus data.
 

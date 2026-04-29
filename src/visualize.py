@@ -118,6 +118,241 @@ IDEOLOGY_COLORS = ["#4472C4", "#A5A5A5", "#C0504D"]
 # 8×5 is a good default for wide charts that fit well in slides.
 FIGURE_SIZE = (8, 5)
 
+# The pipeline only owns a small set of generated file types inside results/.
+# We clean these up before every run so repeated Play-button executions update
+# the same artifacts instead of leaving stale screenshots behind.
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
+
+
+def _remove_files_with_extensions(directory, extensions):
+	"""
+	Delete files in one directory when their extension matches the set.
+
+	WHY THIS EXISTS:
+		The user wants repeated runs to refresh the same result bundle rather
+		than accumulate old images or CSV files. This helper gives the cleanup
+		logic one small, testable job: scan a directory and delete only the
+		file types the pipeline itself owns.
+	"""
+	if not os.path.isdir(directory):
+		return
+
+	for filename in os.listdir(directory):
+		filepath = os.path.join(directory, filename)
+		_, extension = os.path.splitext(filename)
+
+		if os.path.isfile(filepath) and extension.lower() in extensions:
+			os.remove(filepath)
+
+
+def prepare_output_directories(output_dir):
+	"""
+	Create the results folders and clear stale generated outputs.
+
+	WHAT GETS REMOVED:
+		- image files directly inside output_dir
+		- image files inside output_dir/figures
+		- table files are intentionally preserved
+
+	WHY THIS IS SAFE:
+		The project treats results/ as a generated-output area. Cleaning only
+		the image bundle keeps repeated baseline runs tidy without touching the
+		actual source data, project code, or older CSV tables the user may want
+		to compare later.
+
+	RETURNS:
+		tuple(str, str): The figures directory path and the tables directory
+		path so the caller can immediately write the new outputs.
+	"""
+	figures_dir = os.path.join(output_dir, "figures")
+	tables_dir = os.path.join(output_dir, "tables")
+
+	os.makedirs(output_dir, exist_ok=True)
+	os.makedirs(figures_dir, exist_ok=True)
+	os.makedirs(tables_dir, exist_ok=True)
+
+	_remove_files_with_extensions(output_dir, IMAGE_EXTENSIONS)
+	_remove_files_with_extensions(figures_dir, IMAGE_EXTENSIONS)
+
+	return figures_dir, tables_dir
+
+
+def save_rows_table(rows, output_path, fieldnames):
+	"""
+	Save a list of dictionaries as a CSV table with a fixed column order.
+
+	WHY THIS HELPER EXISTS:
+		The original pipeline wrote only one summary row. The experiment mode
+		needs several tables with many rows, but we still want the output code
+		to stay easy to read: define the columns once, then write rows in that
+		exact order.
+	"""
+	with open(output_path, "w", newline="") as csvfile:
+		writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+		writer.writeheader()
+		for row in rows:
+			writer.writerow({field: row.get(field, "") for field in fieldnames})
+
+
+def plot_experiment_metric_summary(
+	summary_rows,
+	output_path,
+	metric_field,
+	title,
+	y_label,
+):
+	"""
+	Plot one experiment-wide summary figure for a single headline metric.
+
+	WHAT THIS FIGURE SHOWS:
+		Each line is one start-node strategy. The x-axis is the number of steps
+		per walk. The y-axis is the average result for the chosen metric after
+		combining the repeated runs across seeds.
+
+	WHY THIS MATTERS:
+		The user wants to present only two simple questions to a non-technical
+		audience. These summary figures stay tightly focused on those questions
+		instead of reproducing the whole technical figure bundle.
+	"""
+	strategy_labels = []
+	for row in summary_rows:
+		label = row["start_policy_label"]
+		if label not in strategy_labels:
+			strategy_labels.append(label)
+
+	colors = ["#4472C4", "#A5A5A5", "#C0504D"]
+	color_map = {
+		label: colors[index % len(colors)]
+		for index, label in enumerate(strategy_labels)
+	}
+
+	fig, ax = plt.subplots(figsize=FIGURE_SIZE)
+
+	for strategy_label in strategy_labels:
+		strategy_rows = [
+			row for row in summary_rows
+			if row["start_policy_label"] == strategy_label
+		]
+		strategy_rows.sort(key=lambda row: row["step_count"])
+
+		steps = [row["step_count"] for row in strategy_rows]
+		values = [row[metric_field] for row in strategy_rows]
+
+		ax.plot(
+			steps,
+			values,
+			marker="o",
+			linewidth=2,
+			color=color_map[strategy_label],
+			label=strategy_label,
+		)
+
+	ax.axhline(0.0, color="black", linestyle="--", linewidth=1, alpha=0.6)
+	ax.set_xlabel("Steps per walk", fontsize=12)
+	ax.set_ylabel(y_label, fontsize=12)
+	ax.set_title(title, fontsize=14)
+	ax.legend(fontsize=10)
+
+	fig.tight_layout()
+	fig.savefig(output_path, dpi=150)
+	plt.close(fig)
+
+
+def generate_experiment_outputs(
+	per_run_rows,
+	grouped_summary_rows,
+	presentation_rows,
+	output_dir="results",
+):
+	"""
+	Write the repeated-experiment outputs in one place.
+
+	OUTPUTS CREATED:
+		1. Two presentation-friendly figures, one for each headline question
+		2. A per-run CSV with one row per strategy/step/seed combination
+		3. A grouped summary CSV averaged across seeds
+		4. A plain-English presentation CSV focused on the two main findings
+
+	This mirrors generate_all_figures(), but for the repeated experiment
+	mode instead of the single baseline run.
+	"""
+	figures_dir = os.path.join(output_dir, "figures")
+	tables_dir = os.path.join(output_dir, "tables")
+	os.makedirs(figures_dir, exist_ok=True)
+	os.makedirs(tables_dir, exist_ok=True)
+
+	plot_experiment_metric_summary(
+		grouped_summary_rows,
+		os.path.join(figures_dir, "experiment_signed_drift_summary.png"),
+		metric_field="signed_drift_mean",
+		title="Average Ideology Direction Change Across Repeated Simulations",
+		y_label="Average ideology direction change",
+	)
+
+	plot_experiment_metric_summary(
+		grouped_summary_rows,
+		os.path.join(figures_dir, "experiment_extremity_change_summary.png"),
+		metric_field="extremity_change_mean",
+		title="Average Extremity Change Across Repeated Simulations",
+		y_label="Average extremity change",
+	)
+
+	save_rows_table(
+		per_run_rows,
+		os.path.join(tables_dir, "experiment_per_run.csv"),
+		fieldnames=[
+			"start_policy",
+			"start_policy_label",
+			"step_count",
+			"seed",
+			"walks_per_start",
+			"available_start_nodes",
+			"selected_start_nodes",
+			TRAJECTORY_COUNT_FIELD,
+			VALID_DRIFT_COUNT_FIELD,
+			MEAN_DRIFT_FIELD,
+			MEAN_ABSOLUTE_DRIFT_FIELD,
+			MEAN_EXTREMITY_CHANGE_FIELD,
+			ASSORTATIVITY_FIELD,
+			CLUSTERING_FIELD,
+		],
+	)
+
+	save_rows_table(
+		grouped_summary_rows,
+		os.path.join(tables_dir, "experiment_grouped_summary.csv"),
+		fieldnames=[
+			"start_policy",
+			"start_policy_label",
+			"step_count",
+			"runs_aggregated",
+			"available_start_nodes",
+			"selected_start_nodes",
+			"walks_per_start",
+			"signed_drift_mean",
+			"signed_drift_std",
+			"signed_drift_min",
+			"signed_drift_max",
+			"extremity_change_mean",
+			"extremity_change_std",
+			"extremity_change_min",
+			"extremity_change_max",
+		],
+	)
+
+	save_rows_table(
+		presentation_rows,
+		os.path.join(tables_dir, "presentation_headline_metrics.csv"),
+		fieldnames=[
+			"start group",
+			"steps per walk",
+			"signed ideological drift",
+			"extremity change",
+			"how to read signed ideological drift",
+			"how to read extremity change",
+		],
+	)
+
 
 # --- FUNCTIONS ----------------------------------------------------------------
 
@@ -476,13 +711,10 @@ def generate_all_figures(G, trajectories, metrics_dict, output_dir="results"):
 	RETURNS:
 		None — all outputs are saved to disk.
 	"""
-	# Create the output directories if they do not already exist.
-	# os.makedirs with exist_ok=True is safe to call even if the
-	# directories already exist — it simply does nothing in that case.
-	figures_dir = os.path.join(output_dir, "figures")
-	tables_dir = os.path.join(output_dir, "tables")
-	os.makedirs(figures_dir, exist_ok=True)
-	os.makedirs(tables_dir, exist_ok=True)
+	# Create the output directories and clear stale generated outputs first.
+	# This guarantees that repeated runs refresh the same result bundle instead
+	# of leaving behind outdated screenshots or old CSV files.
+	figures_dir, tables_dir = prepare_output_directories(output_dir)
 
 	# Generate each figure, passing the full file path.
 	plot_ideology_distribution(

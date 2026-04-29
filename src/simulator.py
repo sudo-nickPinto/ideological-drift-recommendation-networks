@@ -244,6 +244,7 @@ def simulate_walks(
 	rng=None,
 	weight_attr=DEFAULT_WEIGHT_ATTRIBUTE,
 	score_attr=SCORE_ATTRIBUTE,
+	progress_callback=None,
 ):
 	"""
 	Run multiple weighted random walks from one or more starting nodes.
@@ -256,6 +257,10 @@ def simulate_walks(
 		rng (random.Random or None): Random number generator shared across runs.
 		weight_attr (str): Edge attribute used for weighted choice.
 		score_attr (str): Node attribute holding ideology score.
+		progress_callback (callable or None): Optional no-argument callback
+			that is called once after each completed walk. This lets higher
+			layers, such as run_pipeline.py, show a live CLI progress bar
+			without changing the simulator's analytical behavior.
 
 	RETURNS:
 		list[list[dict]]: A list of trajectories.
@@ -284,5 +289,7 @@ def simulate_walks(
 				score_attr=score_attr,
 			)
 			all_trajectories.append(trajectory)
+			if progress_callback is not None:
+				progress_callback()
 
 	return all_trajectories

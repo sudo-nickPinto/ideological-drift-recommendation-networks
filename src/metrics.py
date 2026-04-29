@@ -333,7 +333,32 @@ def compute_average_clustering(G):
 
 # --- SUMMARY WRAPPER ----------------------------------------------------------
 
-def compute_all_metrics(G, trajectories, score_attr=SCORE_ATTRIBUTE, score_field=SCORE_FIELD):
+def compute_graph_metrics(G, score_attr=SCORE_ATTRIBUTE):
+	"""
+	Compute the graph-level metrics that do not depend on any trajectory set.
+
+	WHY THIS EXISTS:
+		In experiment mode the same recommendation graph is reused across many
+		trajectory batches. Assortativity and clustering are properties of that
+		graph itself, so recalculating them for every seed and step count is
+		unnecessary work.
+	"""
+	return {
+		ASSORTATIVITY_FIELD: compute_ideology_assortativity(
+			G,
+			score_attr=score_attr,
+		),
+		CLUSTERING_FIELD: compute_average_clustering(G),
+	}
+
+
+def compute_all_metrics(
+	G,
+	trajectories,
+	score_attr=SCORE_ATTRIBUTE,
+	score_field=SCORE_FIELD,
+	graph_metrics=None,
+):
 	"""
 	Compute the full summary dictionary used by the reporting layer.
 
@@ -342,6 +367,8 @@ def compute_all_metrics(G, trajectories, score_attr=SCORE_ATTRIBUTE, score_field
 		trajectories (list[list[dict]]): Collection of simulated walks.
 		score_attr (str): Node attribute holding ideology score.
 		score_field (str): Step-dictionary key holding ideology score.
+		graph_metrics (dict or None): Optional precomputed graph-only metrics
+			containing ASSORTATIVITY_FIELD and CLUSTERING_FIELD.
 
 	RETURNS:
 		dict: Summary metrics keyed by the constants defined at the top of
@@ -355,6 +382,9 @@ def compute_all_metrics(G, trajectories, score_attr=SCORE_ATTRIBUTE, score_field
 		if drift is not None:
 			valid_drifts.append(drift)
 
+	if graph_metrics is None:
+		graph_metrics = compute_graph_metrics(G, score_attr=score_attr)
+
 	return {
 		TRAJECTORY_COUNT_FIELD: len(trajectories),
 		VALID_DRIFT_COUNT_FIELD: len(valid_drifts),
@@ -367,9 +397,6 @@ def compute_all_metrics(G, trajectories, score_attr=SCORE_ATTRIBUTE, score_field
 			trajectories,
 			score_field=score_field,
 		),
-		ASSORTATIVITY_FIELD: compute_ideology_assortativity(
-			G,
-			score_attr=score_attr,
-		),
-		CLUSTERING_FIELD: compute_average_clustering(G),
+		ASSORTATIVITY_FIELD: graph_metrics[ASSORTATIVITY_FIELD],
+		CLUSTERING_FIELD: graph_metrics[CLUSTERING_FIELD],
 	}

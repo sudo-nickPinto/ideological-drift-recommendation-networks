@@ -272,7 +272,7 @@ def plot_drift_distribution(trajectories, output_path):
 	plt.close(fig)
 
 
-def plot_trajectory_sample(trajectories, output_path, max_lines=20):
+def plot_trajectory_sample(trajectories, output_path, max_lines=10):
 	"""
 	Plot a sample of individual walk trajectories as line plots.
 

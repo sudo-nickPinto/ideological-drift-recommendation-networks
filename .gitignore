@@ -40,6 +40,8 @@ build/
 .vscode/
 # JetBrains IDE project settings directory.
 .idea/
+# Local Copilot workspace instructions are intentionally kept untracked.
+.github/copilot-instructions.md
 
 # Test and lint cache directory used by Python tooling.
 .pytest_cache/

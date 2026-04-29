@@ -91,7 +91,7 @@ from src.metrics import (
     compute_graph_metrics,
     compute_all_metrics,
 )
-from src.simulator import simulate_walks
+from src.simulator import SCORE_FIELD, STEP_FIELD, simulate_walks
 from src.visualize import generate_all_figures, generate_experiment_outputs
 
 
@@ -705,6 +705,7 @@ def _run_repeated_experiments(
         still staying lightweight in architecture.
     """
     per_run_rows = []
+    per_run_step_trend_rows = []
     total_configurations = _count_total_experiment_configurations()
     configuration_index = 0
 
@@ -770,7 +771,17 @@ def _run_repeated_experiments(
                     }
                 )
 
-    return per_run_rows
+                per_run_step_trend_rows.extend(
+                    _build_experiment_step_trend_rows(
+                        start_policy,
+                        start_policy_label,
+                        step_count,
+                        experiment_seed,
+                        trajectories,
+                    )
+                )
+
+    return per_run_rows, per_run_step_trend_rows
 
 
 def _count_total_experiment_configurations():
@@ -782,6 +793,83 @@ def _count_total_experiment_configurations():
         * len(EXPERIMENT_STEP_COUNTS)
         * EXPERIMENT_SEED_COUNT
     )
+
+
+def _build_experiment_step_trend_rows(
+    start_policy,
+    start_policy_label,
+    step_count,
+    experiment_seed,
+    trajectories,
+):
+    """
+    Summarize one experiment configuration step by step.
+
+    WHY THIS EXISTS:
+        The existing experiment summary keeps only endpoint metrics such as
+        final drift and final extremity change. Those are still useful, but a
+        presentation audience can reasonably ask whether we only looked at the
+        last node. This helper keeps a second, more rigorous view: how the
+        average walk is changing at each intermediate step.
+
+    WHAT EACH OUTPUT ROW MEANS:
+        For one configuration (start policy + walk length + seed), the row for
+        step k stores the average signed drift and average extremity change at
+        that exact step relative to step 0.
+    """
+    rows_by_step = {}
+
+    for trajectory in trajectories:
+        if not trajectory:
+            continue
+
+        initial_score = trajectory[0].get(SCORE_FIELD)
+        if initial_score is None:
+            continue
+
+        for record in trajectory:
+            current_score = record.get(SCORE_FIELD)
+            if current_score is None:
+                continue
+
+            step_index = record[STEP_FIELD]
+            bucket = rows_by_step.setdefault(
+                step_index,
+                {
+                    "signed_drifts": [],
+                    "extremity_changes": [],
+                },
+            )
+            bucket["signed_drifts"].append(current_score - initial_score)
+            bucket["extremity_changes"].append(
+                abs(current_score) - abs(initial_score)
+            )
+
+    step_trend_rows = []
+    for step_index in sorted(rows_by_step):
+        signed_drifts = rows_by_step[step_index]["signed_drifts"]
+        extremity_changes = rows_by_step[step_index]["extremity_changes"]
+
+        step_trend_rows.append(
+            {
+                "start_policy": start_policy,
+                "start_policy_label": start_policy_label,
+                "step_count": step_count,
+                "seed": experiment_seed,
+                "step_index": step_index,
+                "valid_observation_count": len(signed_drifts),
+                "mean_signed_drift": (
+                    statistics.fmean(signed_drifts) if signed_drifts else None
+                ),
+                "mean_extremity_change": (
+                    statistics.fmean(extremity_changes)
+                    if extremity_changes
+                    else None
+                ),
+            }
+        )
+
+    return step_trend_rows
 
 
 def _estimate_total_experiment_walks(
@@ -818,6 +906,112 @@ def _estimate_total_experiment_walks(
         )
 
     return total_walks
+
+
+def _summarize_experiment_step_trends(per_run_step_trend_rows):
+    """
+    Aggregate step-by-step experiment rows across repeated seeds.
+
+    WHY THIS EXISTS:
+        The step-trend rows above are still one row per configuration. For the
+        final figures we want one cleaner line per start policy, averaged over
+        the repeated seeds while preserving the within-walk step index.
+    """
+    grouped_summary_rows = []
+    rows_by_group = {}
+
+    for row in per_run_step_trend_rows:
+        group_key = (
+            row["start_policy"],
+            row["start_policy_label"],
+            row["step_count"],
+            row["step_index"],
+        )
+        rows_by_group.setdefault(group_key, []).append(row)
+
+    for start_policy in EXPERIMENT_START_POLICIES:
+        start_policy_label = EXPERIMENT_START_POLICY_LABELS[start_policy]
+
+        for step_count in EXPERIMENT_STEP_COUNTS:
+            step_indexes = sorted(
+                {
+                    row["step_index"]
+                    for row in per_run_step_trend_rows
+                    if row["start_policy"] == start_policy
+                    and row["step_count"] == step_count
+                }
+            )
+
+            for step_index in step_indexes:
+                group_rows = rows_by_group.get(
+                    (start_policy, start_policy_label, step_count, step_index),
+                    [],
+                )
+                if not group_rows:
+                    continue
+
+                total_valid_observations = sum(
+                    row["valid_observation_count"]
+                    for row in group_rows
+                )
+                signed_drift_values = [
+                    row["mean_signed_drift"]
+                    for row in group_rows
+                    if row["mean_signed_drift"] is not None
+                ]
+                extremity_change_values = [
+                    row["mean_extremity_change"]
+                    for row in group_rows
+                    if row["mean_extremity_change"] is not None
+                ]
+
+                signed_drift_weighted_sum = sum(
+                    row["mean_signed_drift"] * row["valid_observation_count"]
+                    for row in group_rows
+                    if row["mean_signed_drift"] is not None
+                )
+                extremity_change_weighted_sum = sum(
+                    row["mean_extremity_change"] * row["valid_observation_count"]
+                    for row in group_rows
+                    if row["mean_extremity_change"] is not None
+                )
+
+                grouped_summary_rows.append(
+                    {
+                        "start_policy": start_policy,
+                        "start_policy_label": start_policy_label,
+                        "step_count": step_count,
+                        "step_index": step_index,
+                        "runs_aggregated": len(group_rows),
+                        "mean_valid_observation_count": (
+                            total_valid_observations / len(group_rows)
+                            if group_rows
+                            else 0.0
+                        ),
+                        "signed_drift_mean": (
+                            signed_drift_weighted_sum / total_valid_observations
+                            if total_valid_observations
+                            else None
+                        ),
+                        "signed_drift_std": (
+                            statistics.stdev(signed_drift_values)
+                            if len(signed_drift_values) > 1
+                            else 0.0
+                        ) if signed_drift_values else None,
+                        "extremity_change_mean": (
+                            extremity_change_weighted_sum / total_valid_observations
+                            if total_valid_observations
+                            else None
+                        ),
+                        "extremity_change_std": (
+                            statistics.stdev(extremity_change_values)
+                            if len(extremity_change_values) > 1
+                            else 0.0
+                        ) if extremity_change_values else None,
+                    }
+                )
+
+    return grouped_summary_rows
 
 
 def _summarize_experiment_results(per_run_rows):
@@ -1105,7 +1299,7 @@ def run_pipeline(
         stream=sys.stdout,
         enabled=progress_enabled,
     )
-    per_run_rows = _run_repeated_experiments(
+    per_run_rows, per_run_step_trend_rows = _run_repeated_experiments(
         graph,
         start_nodes,
         seed,
@@ -1114,11 +1308,15 @@ def run_pipeline(
     )
     experiment_progress_bar.finish("completed")
     grouped_summary_rows, presentation_rows = _summarize_experiment_results(per_run_rows)
+    step_trend_summary_rows = _summarize_experiment_step_trends(
+        per_run_step_trend_rows
+    )
 
     generate_experiment_outputs(
         per_run_rows,
         grouped_summary_rows,
         presentation_rows,
+        step_trend_summary_rows,
         output_dir=str(output_dir),
     )
 
@@ -1136,6 +1334,7 @@ def run_pipeline(
         "per_run_rows": per_run_rows,
         "grouped_summary_rows": grouped_summary_rows,
         "presentation_rows": presentation_rows,
+        "step_trend_summary_rows": step_trend_summary_rows,
         "experiment_total_walks": experiment_total_walks,
         "experiment_configuration_count": experiment_configuration_count,
         "experiment_max_start_nodes_per_policy": EXPERIMENT_MAX_START_NODES_PER_POLICY,
@@ -1293,9 +1492,12 @@ def main(argv=None):
         print("Experiment figures written:")
         print(f"  - {figures_dir / 'experiment_signed_drift_summary.png'}")
         print(f"  - {figures_dir / 'experiment_extremity_change_summary.png'}")
+        print(f"  - {figures_dir / 'experiment_stepwise_signed_drift.png'}")
+        print(f"  - {figures_dir / 'experiment_stepwise_extremity_change.png'}")
         print("Experiment tables written:")
         print(f"  - {tables_dir / 'experiment_per_run.csv'}")
         print(f"  - {tables_dir / 'experiment_grouped_summary.csv'}")
+        print(f"  - {tables_dir / 'experiment_step_trend_summary.csv'}")
         print(f"  - {tables_dir / 'presentation_headline_metrics.csv'}")
     else:
         metrics_dict = summary["metrics"]

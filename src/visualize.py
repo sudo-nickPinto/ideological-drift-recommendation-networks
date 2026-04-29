@@ -258,20 +258,109 @@ def plot_experiment_metric_summary(
 	plt.close(fig)
 
 
+def plot_experiment_step_trend_summary(
+	summary_rows,
+	output_path,
+	metric_field,
+	std_field,
+	title,
+	y_label,
+):
+	"""
+	Plot a step-by-step repeated-experiment trend figure with uncertainty bands.
+
+	WHAT THIS FIGURE SHOWS:
+		Each line is one start-node strategy. The x-axis is the step index within
+		the walk, and the y-axis is the average value of the chosen metric at that
+		step relative to the starting node. The shaded band shows plus/minus one
+		standard deviation across repeated seeds.
+
+	WHY THIS MATTERS:
+		This figure is the answer to the reasonable question, "Did you only look
+		at the final node?" It uses the intermediate trajectory steps directly,
+		so the audience can see how the average walk changes over time rather than
+		seeing only the endpoint summary.
+	"""
+	strategy_labels = []
+	for row in summary_rows:
+		label = row["start_policy_label"]
+		if label not in strategy_labels:
+			strategy_labels.append(label)
+
+	colors = ["#4472C4", "#A5A5A5", "#C0504D"]
+	color_map = {
+		label: colors[index % len(colors)]
+		for index, label in enumerate(strategy_labels)
+	}
+	longest_step_count = max(row["step_count"] for row in summary_rows)
+
+	fig, ax = plt.subplots(figsize=FIGURE_SIZE)
+
+	for strategy_label in strategy_labels:
+		strategy_rows = [
+			row for row in summary_rows
+			if row["start_policy_label"] == strategy_label
+			and row["step_count"] == longest_step_count
+		]
+		strategy_rows.sort(key=lambda row: row["step_index"])
+
+		steps = [row["step_index"] for row in strategy_rows]
+		values = [row[metric_field] for row in strategy_rows]
+		standard_deviations = [row[std_field] or 0.0 for row in strategy_rows]
+		lower_bound = [
+			value - standard_deviation
+			for value, standard_deviation in zip(values, standard_deviations)
+		]
+		upper_bound = [
+			value + standard_deviation
+			for value, standard_deviation in zip(values, standard_deviations)
+		]
+		line_color = color_map[strategy_label]
+
+		ax.plot(
+			steps,
+			values,
+			marker="o",
+			linewidth=2,
+			color=line_color,
+			label=strategy_label,
+		)
+		ax.fill_between(
+			steps,
+			lower_bound,
+			upper_bound,
+			color=line_color,
+			alpha=0.18,
+		)
+
+	ax.axhline(0.0, color="black", linestyle="--", linewidth=1, alpha=0.6)
+	ax.set_xlabel("Step number within walk", fontsize=12)
+	ax.set_ylabel(y_label, fontsize=12)
+	ax.set_title(f"{title} ({longest_step_count}-step runs)", fontsize=14)
+	ax.legend(fontsize=10)
+
+	fig.tight_layout()
+	fig.savefig(output_path, dpi=150)
+	plt.close(fig)
+
+
 def generate_experiment_outputs(
 	per_run_rows,
 	grouped_summary_rows,
 	presentation_rows,
+	step_trend_summary_rows,
 	output_dir="results",
 ):
 	"""
 	Write the repeated-experiment outputs in one place.
 
 	OUTPUTS CREATED:
-		1. Two presentation-friendly figures, one for each headline question
-		2. A per-run CSV with one row per strategy/step/seed combination
-		3. A grouped summary CSV averaged across seeds
-		4. A plain-English presentation CSV focused on the two main findings
+		1. Two endpoint summary figures, one for each headline question
+		2. Two step-by-step trend figures that use the intermediate walk steps
+		3. A per-run CSV with one row per strategy/step/seed combination
+		4. A grouped summary CSV averaged across seeds
+		5. A step-trend summary CSV averaged across seeds
+		6. A plain-English presentation CSV focused on the two main findings
 
 	This mirrors generate_all_figures(), but for the repeated experiment
 	mode instead of the single baseline run.
@@ -295,6 +384,24 @@ def generate_experiment_outputs(
 		metric_field="extremity_change_mean",
 		title="Average Extremity Change Across Repeated Simulations",
 		y_label="Average extremity change",
+	)
+
+	plot_experiment_step_trend_summary(
+		step_trend_summary_rows,
+		os.path.join(figures_dir, "experiment_stepwise_signed_drift.png"),
+		metric_field="signed_drift_mean",
+		std_field="signed_drift_std",
+		title="Step-by-Step Mean Signed Drift Across Repeated Simulations",
+		y_label="Mean signed drift from start",
+	)
+
+	plot_experiment_step_trend_summary(
+		step_trend_summary_rows,
+		os.path.join(figures_dir, "experiment_stepwise_extremity_change.png"),
+		metric_field="extremity_change_mean",
+		std_field="extremity_change_std",
+		title="Step-by-Step Mean Extremity Change Across Repeated Simulations",
+		y_label="Mean extremity change from start",
 	)
 
 	save_rows_table(
@@ -337,6 +444,23 @@ def generate_experiment_outputs(
 			"extremity_change_std",
 			"extremity_change_min",
 			"extremity_change_max",
+		],
+	)
+
+	save_rows_table(
+		step_trend_summary_rows,
+		os.path.join(tables_dir, "experiment_step_trend_summary.csv"),
+		fieldnames=[
+			"start_policy",
+			"start_policy_label",
+			"step_count",
+			"step_index",
+			"runs_aggregated",
+			"mean_valid_observation_count",
+			"signed_drift_mean",
+			"signed_drift_std",
+			"extremity_change_mean",
+			"extremity_change_std",
 		],
 	)
 
@@ -507,7 +631,7 @@ def plot_drift_distribution(trajectories, output_path):
 	plt.close(fig)
 
 
-def plot_trajectory_sample(trajectories, output_path, max_lines=10):
+def plot_trajectory_sample(trajectories, output_path, max_lines=3):
 	"""
 	Plot a sample of individual walk trajectories as line plots.
 
@@ -529,11 +653,17 @@ def plot_trajectory_sample(trajectories, output_path, max_lines=10):
 		trajectories (list[list[dict]]): Collection of walk trajectories.
 		output_path (str): Full file path where the PNG will be saved.
 		max_lines (int): Maximum number of trajectories to display.
-			Default is 20. If fewer trajectories exist, all are shown.
+			Default is 3. If fewer trajectories exist, all are shown.
 
 	RETURNS:
 		None — the figure is saved to disk.
 	"""
+	# The presentation version of this figure is intentionally small.
+	# Three walks are enough to show the idea without turning the chart
+	# into a tangle of overlapping lines.
+	if max_lines < 1:
+		raise ValueError("max_lines must be at least 1.")
+
 	# Select the sample.
 	# If there are fewer trajectories than max_lines, use all of them.
 	# Otherwise, take an evenly spaced sample using list slicing.
@@ -552,32 +682,86 @@ def plot_trajectory_sample(trajectories, output_path, max_lines=10):
 		sample = trajectories[::step][:max_lines]
 
 	fig, ax = plt.subplots(figsize=FIGURE_SIZE)
+	walk_colors = ["#1F77B4", "#FF7F0E", "#2CA02C"]
+	walk_handles = []
 
-	for trajectory in sample:
+	for walk_number, trajectory in enumerate(sample, start=1):
 		# Extract the step numbers and ideology scores from the trajectory.
 		# Each trajectory is a list of dictionaries like:
 		#   [{"step": 0, "node_id": "ch_L1", "ideology_score": -1.0}, ...]
 		steps = [record[STEP_FIELD] for record in trajectory]
 		scores = [record[SCORE_FIELD] for record in trajectory]
+		walk_color = walk_colors[(walk_number - 1) % len(walk_colors)]
 
 		# Plot one line per trajectory.
-		# alpha=0.5 makes lines semi-transparent so overlapping paths
-		# are still distinguishable.
-		ax.plot(steps, scores, alpha=0.5, linewidth=1.0)
+		# The walk legend is separate from the ideology legend so the viewer
+		# can tell both "which line is which walk" and "what the reference
+		# ideology levels mean" without the two ideas being mixed together.
+		(walk_line,) = ax.plot(
+			steps,
+			scores,
+			alpha=0.95,
+			linewidth=2.5,
+			marker="o",
+			markersize=4,
+			color=walk_color,
+			label=f"Walk {walk_number}",
+		)
+		walk_handles.append(walk_line)
 
 	# Draw horizontal reference lines at the three ideology levels.
 	# These help the audience see whether paths cluster near one level.
-	ax.axhline(-1.0, color="#4472C4", linestyle=":", alpha=0.4, label="Left (−1)")
-	ax.axhline(0.0, color="#A5A5A5", linestyle=":", alpha=0.4, label="Center (0)")
-	ax.axhline(1.0, color="#C0504D", linestyle=":", alpha=0.4, label="Right (+1)")
+	left_line = ax.axhline(
+		-1.0,
+		color="#4472C4",
+		linestyle=":",
+		alpha=0.6,
+		linewidth=1.5,
+		label="Left (−1)",
+	)
+	center_line = ax.axhline(
+		0.0,
+		color="#7F7F7F",
+		linestyle=":",
+		alpha=0.6,
+		linewidth=1.5,
+		label="Center (0)",
+	)
+	right_line = ax.axhline(
+		1.0,
+		color="#C0504D",
+		linestyle=":",
+		alpha=0.6,
+		linewidth=1.5,
+		label="Right (+1)",
+	)
 
 	ax.set_xlabel("Step Number", fontsize=12)
 	ax.set_ylabel("Ideology Score", fontsize=12)
 	ax.set_title(f"Sample of {len(sample)} Walk Trajectories", fontsize=14)
 	ax.set_ylim(-1.3, 1.3)  # Slight padding beyond the score range.
-	ax.legend(loc="upper right", fontsize=9)
 
-	fig.tight_layout()
+	walk_legend = ax.legend(
+		handles=walk_handles,
+		title="Walk Key",
+		loc="upper left",
+		bbox_to_anchor=(1.02, 1.0),
+		fontsize=9,
+		title_fontsize=10,
+		framealpha=0.95,
+	)
+	ax.add_artist(walk_legend)
+	ax.legend(
+		handles=[left_line, center_line, right_line],
+		title="Ideology Key",
+		loc="lower left",
+		bbox_to_anchor=(1.02, 0.0),
+		fontsize=9,
+		title_fontsize=10,
+		framealpha=0.95,
+	)
+
+	fig.tight_layout(rect=(0.0, 0.0, 0.82, 1.0))
 	fig.savefig(output_path, dpi=150)
 	plt.close(fig)
 

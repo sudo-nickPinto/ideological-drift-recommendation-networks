@@ -24,7 +24,9 @@ The core analysis pipeline is implemented and covered by pytest.
 
 What is not in the repository yet:
 
-- Committed generated figures or metrics tables from the real dataset. The `results/` directories exist for local outputs, but generated artifacts remain untracked.
+- Committed generated metrics tables from the real dataset. The PNG figures in
+   `results/figures/` are tracked for presentation convenience, but the CSV
+   tables remain regenerable local outputs.
 
 ## Implemented Pipeline
 
@@ -120,9 +122,9 @@ The same entrypoint supports two workflows:
    This first refreshes the baseline bundle, then runs a repeated experiment
    across three start policies, four step counts, and multiple seeds to make
    the two headline questions more defensible. It also writes two
-   experiment-specific summary PNGs and prints experiment-level headline
-   numbers in the terminal so the repeated run does not look identical to the
-   baseline pass.
+   experiment-specific endpoint-summary PNGs, two step-by-step trend PNGs,
+   and prints experiment-level headline numbers in the terminal so the
+   repeated run does not look identical to the baseline pass.
 
 Use experiment mode like this:
 
@@ -176,10 +178,17 @@ python3 -m pytest -v
 - `results/figures/extremity_distribution.png`
 - `results/figures/experiment_signed_drift_summary.png`
 - `results/figures/experiment_extremity_change_summary.png`
+- `results/figures/experiment_stepwise_signed_drift.png`
+- `results/figures/experiment_stepwise_extremity_change.png`
 - `results/tables/summary_metrics.csv`
 - `results/tables/experiment_per_run.csv`
 - `results/tables/experiment_grouped_summary.csv`
+- `results/tables/experiment_step_trend_summary.csv`
 - `results/tables/presentation_headline_metrics.csv`
+
+The trajectory sample figure is intentionally presentation-friendly: by default it
+shows three labeled walks and a separate ideology key so the chart stays readable
+on slides.
 
 Repeated runs automatically delete stale image files from `results/` and
 `results/figures/` before writing the current PNG bundle. Existing CSV tables
@@ -190,7 +199,14 @@ The presentation table is intentionally plain English. It focuses only on:
 - signed ideological drift: whether the network tends to push users left or right overall
 - extremity change: whether walks tend to end farther from or closer to the center
 
-Those outputs are intentionally untracked because they are regenerable from code plus data.
+Experiment mode also writes two step-by-step trend figures based on the
+longest repeated-walk setting. Those figures average drift and extremity at
+each intermediate step across repeated runs, so the evidence is not limited to
+comparing only the final node against the starting node.
+
+The PNG figure bundle in `results/figures/` is tracked for presentation
+convenience. Generated CSV tables remain untracked because they are
+regenerable from code plus data.
 
 ## Source-of-Truth Guidance
 

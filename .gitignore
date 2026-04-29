@@ -42,6 +42,7 @@ build/
 .idea/
 # Local Copilot workspace instructions are intentionally kept untracked.
 .github/copilot-instructions.md
+skills
 
 # Test and lint cache directory used by Python tooling.
 .pytest_cache/
@@ -72,8 +73,13 @@ data/*.zip
 !data/README.md
 
 # --- Generated results ---
-# Output artifacts are regenerable from code + data; not tracked.
+# Commit the PNG figure bundle for presentation convenience.
 results/*
+!results/figures/
+!results/tables/
+results/figures/*
+results/tables/*
 # Keep .gitkeep files so the directory structure is preserved.
 !results/figures/.gitkeep
+!results/figures/*.png
 !results/tables/.gitkeep

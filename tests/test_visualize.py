@@ -38,6 +38,7 @@
 import csv
 import os
 
+import matplotlib.pyplot as plt
 import networkx as nx
 import pytest
 
@@ -47,6 +48,7 @@ from src.simulator import SCORE_FIELD, STEP_FIELD
 from src.visualize import (
 	generate_all_figures,
 	plot_drift_distribution,
+	plot_experiment_step_trend_summary,
 	plot_extremity_distribution,
 	plot_ideology_distribution,
 	plot_trajectory_sample,
@@ -182,6 +184,76 @@ def test_plot_drift_distribution_empty_trajectories(tmp_path):
 	assert os.path.isfile(output_path), "PNG file was not created for empty input."
 
 
+def test_plot_experiment_step_trend_summary_creates_file(tmp_path):
+	"""
+	WHAT: Call plot_experiment_step_trend_summary() with small hand-built rows.
+	EXPECT: A PNG file appears at the specified output path.
+	WHY: This verifies the new repeated-experiment trend figure can render its
+		mean lines plus uncertainty bands without crashing.
+	"""
+	summary_rows = [
+		{
+			"start_policy": "all_valid",
+			"start_policy_label": "Current valid starts",
+			"step_count": 5,
+			"step_index": 0,
+			"runs_aggregated": 2,
+			"mean_valid_observation_count": 10,
+			"signed_drift_mean": 0.0,
+			"signed_drift_std": 0.0,
+			"extremity_change_mean": 0.0,
+			"extremity_change_std": 0.0,
+		},
+		{
+			"start_policy": "all_valid",
+			"start_policy_label": "Current valid starts",
+			"step_count": 5,
+			"step_index": 1,
+			"runs_aggregated": 2,
+			"mean_valid_observation_count": 10,
+			"signed_drift_mean": -0.1,
+			"signed_drift_std": 0.02,
+			"extremity_change_mean": 0.05,
+			"extremity_change_std": 0.01,
+		},
+		{
+			"start_policy": "center_only",
+			"start_policy_label": "Center-only starts",
+			"step_count": 5,
+			"step_index": 0,
+			"runs_aggregated": 2,
+			"mean_valid_observation_count": 8,
+			"signed_drift_mean": 0.0,
+			"signed_drift_std": 0.0,
+			"extremity_change_mean": 0.0,
+			"extremity_change_std": 0.0,
+		},
+		{
+			"start_policy": "center_only",
+			"start_policy_label": "Center-only starts",
+			"step_count": 5,
+			"step_index": 1,
+			"runs_aggregated": 2,
+			"mean_valid_observation_count": 8,
+			"signed_drift_mean": -0.05,
+			"signed_drift_std": 0.01,
+			"extremity_change_mean": 0.15,
+			"extremity_change_std": 0.02,
+		},
+	]
+
+	output_path = str(tmp_path / "experiment_step_trend.png")
+	plot_experiment_step_trend_summary(
+		summary_rows,
+		output_path,
+		metric_field="signed_drift_mean",
+		std_field="signed_drift_std",
+		title="Step-by-Step Mean Signed Drift Across Repeated Simulations",
+		y_label="Mean signed drift from start",
+	)
+	assert os.path.isfile(output_path), "PNG file was not created."
+
+
 # --- TESTS: plot_trajectory_sample() ------------------------------------------
 
 def test_plot_trajectory_sample_creates_file(sample_trajectories, tmp_path):
@@ -209,6 +281,50 @@ def test_plot_trajectory_sample_limits_lines(tmp_path):
 	output_path = str(tmp_path / "trajectory_limited.png")
 	plot_trajectory_sample(many_trajectories, output_path, max_lines=5)
 	assert os.path.isfile(output_path), "PNG file was not created."
+
+
+def test_plot_trajectory_sample_default_uses_three_walks_and_two_legends(tmp_path, monkeypatch):
+	"""
+	WHAT: Call plot_trajectory_sample() without overriding max_lines.
+	EXPECT: The default figure title reflects 3 sampled walks and the chart
+		contains separate legends for the walk labels and ideology reference lines.
+	WHY: The presentation version of this figure should stay visually simple
+		and clearly labeled by default.
+	"""
+	many_trajectories = [
+		[
+			{STEP_FIELD: 0, "node_id": f"start_{index}", SCORE_FIELD: -1.0},
+			{STEP_FIELD: 1, "node_id": f"mid_{index}", SCORE_FIELD: 0.0},
+			{STEP_FIELD: 2, "node_id": f"end_{index}", SCORE_FIELD: 1.0},
+		]
+		for index in range(12)
+	]
+
+	captured = {}
+	original_close = plt.close
+
+	def fake_savefig(self, *args, **kwargs):
+		captured["figure"] = self
+
+	def fake_close(fig=None):
+		return None
+
+	monkeypatch.setattr("matplotlib.figure.Figure.savefig", fake_savefig)
+	monkeypatch.setattr(plt, "close", fake_close)
+
+	try:
+		plot_trajectory_sample(many_trajectories, str(tmp_path / "ignored.png"))
+		fig = captured["figure"]
+		ax = fig.axes[0]
+
+		assert ax.get_title() == "Sample of 3 Walk Trajectories"
+		assert len(ax.get_lines()) == 6
+		assert len(ax.artists) == 1
+		assert ax.artists[0].get_title().get_text() == "Walk Key"
+		assert ax.get_legend() is not None
+		assert ax.get_legend().get_title().get_text() == "Ideology Key"
+	finally:
+		original_close("all")
 
 
 # --- TESTS: plot_extremity_distribution() ------------------------------------

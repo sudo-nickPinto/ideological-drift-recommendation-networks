@@ -129,6 +129,7 @@ def test_run_pipeline_experiment_mode_writes_tables_and_keeps_baseline_bundle(
     assert len(summary["per_run_rows"]) == 12
     assert len(summary["grouped_summary_rows"]) == 6
     assert len(summary["presentation_rows"]) == 6
+    assert len(summary["step_trend_summary_rows"]) > 0
     assert summary["experiment_configuration_count"] == 12
     assert summary["num_walks"] == summary["experiment_total_walks"]
     assert summary["experiment_total_walks"] == sum(
@@ -149,9 +150,12 @@ def test_run_pipeline_experiment_mode_writes_tables_and_keeps_baseline_bundle(
         tmp_path / "figures" / "extremity_distribution.png",
         tmp_path / "figures" / "experiment_signed_drift_summary.png",
         tmp_path / "figures" / "experiment_extremity_change_summary.png",
+        tmp_path / "figures" / "experiment_stepwise_signed_drift.png",
+        tmp_path / "figures" / "experiment_stepwise_extremity_change.png",
         tmp_path / "tables" / "summary_metrics.csv",
         tmp_path / "tables" / "experiment_per_run.csv",
         tmp_path / "tables" / "experiment_grouped_summary.csv",
+        tmp_path / "tables" / "experiment_step_trend_summary.csv",
         tmp_path / "tables" / "presentation_headline_metrics.csv",
     ]
 

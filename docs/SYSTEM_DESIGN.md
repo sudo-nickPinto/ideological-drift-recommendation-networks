@@ -153,8 +153,9 @@ Implemented public functions:
 
 - `plot_ideology_distribution(G, output_path)`
 - `plot_drift_distribution(trajectories, output_path)`
-- `plot_trajectory_sample(trajectories, output_path, max_lines=20)`
+- `plot_trajectory_sample(trajectories, output_path, max_lines=3)`
 - `plot_extremity_distribution(trajectories, output_path)`
+- `plot_experiment_step_trend_summary(summary_rows, output_path, metric_field, std_field, title, y_label)`
 - `save_metrics_table(metrics_dict, output_path)`
 - `save_rows_table(rows, output_path, fieldnames)`
 - `generate_all_figures(G, trajectories, metrics_dict, output_dir="results")`
@@ -170,6 +171,8 @@ Key implementation choices:
 - Uses the Matplotlib `Agg` backend so plots can be generated without a display.
 - Uses seaborn styling for readable defaults.
 - Writes local artifacts into `results/figures/` and `results/tables/`.
+- Keeps the trajectory-sample figure intentionally small by default with three labeled walks plus a separate ideology-key legend so presentation slides stay readable.
+- Generates additional experiment-mode step-trend figures that average drift and extremity at each intermediate step of the longest repeated walks, so the presentation evidence is not limited to endpoint-only summaries.
 - Clears stale image files before writing a new baseline figure bundle, while preserving older CSV tables unless a run overwrites a specific filename.
 - Closes figures after saving to avoid memory buildup.
 

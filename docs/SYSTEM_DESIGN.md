@@ -153,9 +153,8 @@ Implemented public functions:
 
 - `plot_ideology_distribution(G, output_path)`
 - `plot_drift_distribution(trajectories, output_path)`
-- `plot_trajectory_sample(trajectories, output_path, max_lines=3)`
+- `plot_trajectory_sample(trajectories, output_path, max_lines=10)`
 - `plot_extremity_distribution(trajectories, output_path)`
-- `plot_experiment_step_trend_summary(summary_rows, output_path, metric_field, std_field, title, y_label)`
 - `save_metrics_table(metrics_dict, output_path)`
 - `save_rows_table(rows, output_path, fieldnames)`
 - `generate_all_figures(G, trajectories, metrics_dict, output_dir="results")`
@@ -171,8 +170,7 @@ Key implementation choices:
 - Uses the Matplotlib `Agg` backend so plots can be generated without a display.
 - Uses seaborn styling for readable defaults.
 - Writes local artifacts into `results/figures/` and `results/tables/`.
-- Keeps the trajectory-sample figure intentionally small by default with three labeled walks plus a separate ideology-key legend so presentation slides stay readable.
-- Generates additional experiment-mode step-trend figures that average drift and extremity at each intermediate step of the longest repeated walks, so the presentation evidence is not limited to endpoint-only summaries.
+- Shows a readable subset of walk trajectories with ideology reference lines instead of plotting every walk at once.
 - Clears stale image files before writing a new baseline figure bundle, while preserving older CSV tables unless a run overwrites a specific filename.
 - Closes figures after saving to avoid memory buildup.
 
@@ -202,33 +200,14 @@ Default orchestration behavior:
 - Runs deterministic walks with a fixed random seed
 - Writes outputs to `results/`
 
-Implemented run modes:
+Implemented orchestration model:
 
-- `baseline`
-  Runs the original single simulation path and refreshes the four baseline PNGs plus `summary_metrics.csv`.
-- `experiment`
-  Runs the same baseline pass first, then repeats the simulation across three start policies, four step counts, and multiple seeds before writing three experiment CSV tables plus two experiment-summary PNG figures. Its CLI summary also switches to experiment-level headline metrics so the repeated run is not reported as if it were just the baseline pass again.
-
-Current repeated-experiment volume controls:
-
-- `5` walks per selected start node
-- `5` seeds per configuration family
-- up to `900` selected start nodes per policy
-
-The repeated run also exposes a live CLI dashboard while the simulator is
-working so long experiment launches do not look frozen in the terminal.
-
-The repeated experiment is still centered on the same two audience-facing
-questions:
-
-- Does the network tend to push users left or right overall?
-- Does the network tend to push users farther from the ideological center?
-
-Experiment-mode start policies:
-
-- `all_valid`: every node that passes the normal valid-start rule
-- `center_only`: valid starts whose ideology score is exactly `0.0`
-- `ideology_balanced`: equal-sized Left, Center, and Right samples based on the smallest ideology bucket
+- `run_pipeline(...)` executes one repeatable path.
+- Repeats are controlled by `repeat_count`.
+- Repeat `k` uses `seed + k`.
+- Each repeat runs the same start-node rule and same walk settings.
+- The pipeline writes four core figures, `summary_metrics.csv`, and one
+  `repeated_runs_summary.csv` table with one row per repeat plus one aggregate row.
 
 ## Data Flow
 
@@ -241,8 +220,8 @@ CSV files
   -> scored graph with IDEOLOGY_SCORE on nodes
   -> simulated trajectories
   -> drift and structural metrics
-  -> PNG figures + baseline CSV summary
-  -> optional repeated-experiment PNG summaries + CSV summaries
+  -> PNG figures + summary CSV
+  -> repeated-runs CSV summary
 ```
 
 The design stays local and in-memory. There is no database, API server, message queue, or front-end application because the current project does not need them. The workload is a research pipeline over a static dataset, so keeping everything in Python objects is the most direct and least fragile option.
@@ -265,7 +244,7 @@ The repository layout that exists today is:
 | `tests/test_simulator.py` | Validates weighted selection, dead ends, trajectory shape, and input checks |
 | `tests/test_metrics.py` | Validates formulas, graph metrics, and packaged summaries |
 | `tests/test_visualize.py` | Smoke-tests file generation and CSV content |
-| `tests/test_run_pipeline.py` | Smoke-tests the orchestration layer for baseline mode, experiment mode, and cleanup behavior |
+| `tests/test_run_pipeline.py` | Smoke-tests the orchestration layer, repeated-run summary output, and validation errors |
 | `tests/fixtures/` | Synthetic test CSVs used across the suite |
 | `data/README.md` | Dataset provenance and schema notes |
 | `results/` | Local output destination for generated artifacts |
@@ -281,7 +260,7 @@ The test suite is organized around the same pipeline order as the code.
 - `test_simulator.py` checks dead-end handling, forced-choice paths, bad inputs, weight overrides, and multi-walk output structure.
 - `test_metrics.py` checks exact hand-computed drift formulas, summary math, assortativity edge cases, clustering, and summary-field contracts.
 - `test_visualize.py` checks that figures and CSV outputs are created successfully, and that the summary CSV content matches expected keys and values.
-- `test_run_pipeline.py` checks the scored-graph preparation step, default start-node selection, baseline output generation, experiment-mode table and figure generation, experiment-summary reporting, stale-image cleanup, and the failure mode when no valid start nodes exist.
+- `test_run_pipeline.py` checks scored-graph preparation, default start-node selection, simplified output generation, repeated-runs summary output, repeat-count validation, and the failure mode when no valid start nodes exist.
 
 ### Why the tests use synthetic fixtures
 

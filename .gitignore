@@ -73,7 +73,7 @@ data/*.zip
 !data/README.md
 
 # --- Generated results ---
-# Commit the PNG figure bundle for presentation convenience.
+# Keep the final figure and table bundle while ignoring other generated output.
 results/*
 !results/figures/
 !results/tables/

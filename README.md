@@ -6,7 +6,7 @@ Graph-based analysis code for studying whether a recommendation network can move
 
 The project uses the Recfluence YouTube recommendation dataset to model channels as nodes, recommendations as directed edges, and channel ideology as a numeric score. The implemented pipeline then simulates weighted recommendation-following behavior, computes drift and structural metrics, and generates figures plus summary tables.
 
-The current presentation-facing questions are simple:
+The core research questions are simple:
 
 1. Do recommendation paths tend to change ideology direction overall?
 2. Do recommendation paths tend to increase ideological extremity?
@@ -22,11 +22,9 @@ The core analysis pipeline is implemented and covered by pytest.
 - Figure and CSV generation are implemented in `src/visualize.py`.
 - Synthetic fixture-driven tests exist for every module in `tests/`.
 
-What is not in the repository yet:
-
-- Committed generated metrics tables from the real dataset. The PNG figures in
-   `results/figures/` are tracked for presentation convenience, but the CSV
-   tables remain regenerable local outputs.
+The repository keeps the analysis code, the test fixtures, and a final results
+bundle. The raw Recfluence CSV files are still external and should be downloaded
+into `data/` as described in [data/README.md](data/README.md).
 
 ## Implemented Pipeline
 
@@ -104,63 +102,27 @@ That script loads the real dataset from `data/`, builds and scores the graph,
 runs deterministic weighted random walks, computes metrics, and writes figures
 plus `summary_metrics.csv` into `results/`.
 
-Optional flags:
+
+## Repeatable Runs
+
+The project now uses one simple workflow:
+
+1. Build and score the graph.
+2. Select valid start nodes (known ideology score and outgoing edge).
+3. Run repeated simulations using seed offsets (`seed`, `seed + 1`, ..., `seed + repeat_count - 1`).
+4. Aggregate those repeated runs with the same drift/extremity formulas.
+5. Write the four core figures, `summary_metrics.csv`, and one repeated-runs CSV.
+
+Use a larger repeat set like this:
 
 ```bash
-python3 run.py --num-steps 15 --walks-per-start 2 --seed 123
+python3 run.py --repeat-count 10
 ```
-
-## Two Run Modes
-
-The same entrypoint supports two workflows:
-
-1. Baseline mode
-   This is the default. It runs one deterministic simulation using the current
-   start-node rule and writes the familiar four PNG figures plus
-   `results/tables/summary_metrics.csv`.
-2. Experiment mode
-   This first refreshes the baseline bundle, then runs a repeated experiment
-   across three start policies, four step counts, and multiple seeds to make
-   the two headline questions more defensible. It also writes two
-   experiment-specific endpoint-summary PNGs, two step-by-step trend PNGs,
-   and prints experiment-level headline numbers in the terminal so the
-   repeated run does not look identical to the baseline pass.
-
-Use experiment mode like this:
-
-```bash
-python3 run.py --mode experiment
-```
-
-The repeated experiment keeps the ideology metric formulas unchanged. It varies:
-
-- Start policy: current valid starts, center-only starts, ideology-balanced starts
-- Steps per walk: `1`, `5`, `10`, `20`
-- Walks per start: `5`
-- Seeds: `5`
-- Start-node cap per policy: `900`
-
-In experiment mode, the baseline CLI flags `--num-steps`, `--walks-per-start`,
-and `--seed` still control the baseline refresh pass. The repeated experiment
-uses its fixed matrix inside `src/run_pipeline.py`.
-
-When you launch experiment mode from a real terminal, the CLI now shows a live
-simulation dashboard with a progress bar, current configuration number, start
-group, seed, steps per walk, and selected-start counts.
 
 ## Validation
 
 The commands below assume the project virtual environment is already active
 with `source .venv/bin/activate`.
-
-The narrowest routine checks in this repository are the module-level pytest files.
-
-```bash
-python3 -m pytest tests/test_graph_builder.py -v
-python3 -m pytest tests/test_ideology.py -v
-python3 -m pytest tests/test_simulator.py -v
-python3 -m pytest tests/test_metrics.py tests/test_visualize.py -v
-```
 
 To run the full current test suite:
 
@@ -176,39 +138,19 @@ python3 -m pytest -v
 - `results/figures/drift_distribution.png`
 - `results/figures/trajectory_sample.png`
 - `results/figures/extremity_distribution.png`
-- `results/figures/experiment_signed_drift_summary.png`
-- `results/figures/experiment_extremity_change_summary.png`
-- `results/figures/experiment_stepwise_signed_drift.png`
-- `results/figures/experiment_stepwise_extremity_change.png`
 - `results/tables/summary_metrics.csv`
-- `results/tables/experiment_per_run.csv`
-- `results/tables/experiment_grouped_summary.csv`
-- `results/tables/experiment_step_trend_summary.csv`
-- `results/tables/presentation_headline_metrics.csv`
+- `results/tables/repeated_runs_summary.csv`
 
-The trajectory sample figure is intentionally presentation-friendly: by default it
-shows three labeled walks and a separate ideology key so the chart stays readable
-on slides.
+The trajectory sample figure shows a small subset of walks with ideology
+reference lines so the overall path shape stays readable.
 
-Repeated runs automatically delete stale image files from `results/` and
-`results/figures/` before writing the current PNG bundle. Existing CSV tables
-in `results/tables/` are preserved unless a run overwrites a specific file.
+Each run overwrites the tracked output filenames above so reruns remain easy to
+compare and replay.
 
-The presentation table is intentionally plain English. It focuses only on:
+The tracked `results/` bundle is a reference snapshot of the finished project
+and can be regenerated from the code plus the source dataset.
 
-- signed ideological drift: whether the network tends to push users left or right overall
-- extremity change: whether walks tend to end farther from or closer to the center
-
-Experiment mode also writes two step-by-step trend figures based on the
-longest repeated-walk setting. Those figures average drift and extremity at
-each intermediate step across repeated runs, so the evidence is not limited to
-comparing only the final node against the starting node.
-
-The PNG figure bundle in `results/figures/` is tracked for presentation
-convenience. Generated CSV tables remain untracked because they are
-regenerable from code plus data.
-
-## Source-of-Truth Guidance
+## Source-of-Truth
 
 Use the repository documents in this order when you need to understand or update the project:
 

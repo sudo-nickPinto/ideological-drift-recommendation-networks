@@ -6,6 +6,10 @@ Graph-based analysis code for studying whether a recommendation network can move
 
 The project uses the Recfluence YouTube recommendation dataset to model channels as nodes, recommendations as directed edges, and channel ideology as a numeric score. The implemented pipeline then simulates weighted recommendation-following behavior, computes drift and structural metrics, and generates figures plus summary tables.
 
+This repository analyzes YouTube's logged-off recommendation graph as captured
+by the Recfluence dataset. It does not model personalized recommendations based
+on user history, subscriptions, likes, or account state.
+
 The core research questions are simple:
 
 1. Do recommendation paths tend to change ideology direction overall?
@@ -35,7 +39,7 @@ The analysis flow in the codebase is:
 2. `ideology.py`
    Converts `LR` labels into `IDEOLOGY_SCORE` values using `L -> -1.0`, `C -> 0.0`, and `R -> 1.0`.
 3. `simulator.py`
-   Runs weighted random walks using `RELEVANT_IMPRESSIONS_DAILY` as the default edge weight.
+   Runs weighted random walks using `RELEVANT_IMPRESSIONS_DAILY` as the default edge weight. If outgoing edges exist but their weights are missing or unusable, the simulator warns and falls back to uniform random choice so the degradation is visible.
 4. `metrics.py`
    Computes per-walk drift, extremity change, mean summaries, ideology assortativity, average clustering, and a packaged metrics dictionary.
 5. `visualize.py`
@@ -118,6 +122,14 @@ Use a larger repeat set like this:
 ```bash
 python3 run.py --repeat-count 10
 ```
+
+## Limitations
+
+- The dataset is a historical snapshot from February 2023, so results should not be treated as a claim about the current YouTube platform.
+- Recommendations are logged-off defaults rather than personalized recommendations.
+- Walks terminate early when they reach nodes with no outgoing edges. If graph connectivity differs across ideology groups, that can influence drift estimates.
+- Ideology is reduced to three bins (`L`, `C`, `R`) and mapped to `-1`, `0`, `+1`, which is analytically convenient but politically coarse.
+- Ideology assortativity is computed on the directed recommendation graph, while average clustering is computed on an undirected copy to measure local neighborhood density.
 
 ## Validation
 

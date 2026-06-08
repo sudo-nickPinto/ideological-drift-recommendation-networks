@@ -134,11 +134,30 @@ def test_choose_next_node_falls_back_to_uniform_when_all_weights_zero():
 	G.add_edge("A", "C", RELEVANT_IMPRESSIONS_DAILY=0.0)
 
 	rng = random.Random(7)
-	result = choose_next_node(G, "A", rng=rng)
+	with pytest.warns(RuntimeWarning, match="no usable positive values"):
+		result = choose_next_node(G, "A", rng=rng)
 
 	assert result in {"B", "C"}, (
 		f"Expected uniform fallback to choose 'B' or 'C', got {result!r}."
 	)
+
+
+def test_choose_next_node_warns_when_weight_attribute_missing():
+	"""
+	WHAT: If outgoing edges exist but the weight attribute is absent, the
+		  simulator should warn before falling back to uniform choice.
+
+	WHY: Silent degradation would make a weighted-walk study look valid even
+		 when the graph no longer contains the required edge weights.
+	"""
+	G = nx.DiGraph()
+	G.add_edge("A", "B")
+	G.add_edge("A", "C")
+
+	with pytest.warns(RuntimeWarning, match="missing the weight attribute"):
+		result = choose_next_node(G, "A", rng=random.Random(3))
+
+	assert result in {"B", "C"}
 
 
 # ==============================================================================

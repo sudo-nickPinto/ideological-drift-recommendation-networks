@@ -54,3 +54,9 @@ Each row is a directed recommendation from one channel to another. This is the *
 - **Self-loops:** 6,942 edges where a channel recommends itself. These should be filtered during graph construction.
 - **LR distribution:** R=4,034, C=2,120, L=925. The rightward skew may reflect the YouTube political landscape or collection methodology.
 - **Logged-off data:** Recommendations were scraped without user login, reflecting YouTube's default algorithm rather than personalized results.
+
+## Interpretation notes
+
+- **Historical snapshot:** The data reflects the recommendation graph as captured on 2023-02-18. The current YouTube platform may behave differently.
+- **Default recommendations only:** Logged-off recommendations are useful for studying platform-wide defaults, but they should not be treated as a proxy for personalized feeds.
+- **Label provenance:** The `LR` field is inherited from the Recfluence project. This repository uses those labels as provided and maps them directly to `-1`, `0`, and `+1` without adding an extra validation layer.

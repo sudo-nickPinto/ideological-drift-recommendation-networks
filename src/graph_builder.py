@@ -33,8 +33,9 @@
 #
 # ==============================================================================
 
+import os
 
-import pandas as pd      
+import pandas as pd
 import networkx as nx     # networkx: provides the DiGraph data structure and
                           # graph algorithms
 
@@ -65,6 +66,49 @@ EDGE_ATTRIBUTE_COLUMNS = [
     "PERCENT_OF_CHANNEL_RECS",         # Fraction of source's total recs
 ]
 
+REQUIRED_NODE_COLUMNS = [
+    NODE_ID_COLUMN,
+    "LR",
+]
+
+REQUIRED_EDGE_COLUMNS = [
+    EDGE_SOURCE_COLUMN,
+    EDGE_TARGET_COLUMN,
+    "RELEVANT_IMPRESSIONS_DAILY",
+]
+
+
+def _read_csv_with_validation(filepath, required_columns, dataset_label):
+    """
+    Read one CSV file and fail clearly if the file or schema is wrong.
+
+    WHY THIS EXISTS:
+        Research code should not silently degrade when an input file is
+        missing or missing required columns. If the CSV schema is wrong, we
+        stop immediately with a message that points the user to the dataset
+        setup instructions.
+    """
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(
+            f"Could not find the {dataset_label} CSV at '{filepath}'. "
+            "Download the required Recfluence files into data/ as described "
+            "in data/README.md."
+        )
+
+    dataframe = pd.read_csv(filepath, comment="#")
+    missing_columns = [
+        column_name
+        for column_name in required_columns
+        if column_name not in dataframe.columns
+    ]
+    if missing_columns:
+        raise ValueError(
+            f"The {dataset_label} CSV at '{filepath}' is missing required "
+            f"column(s): {missing_columns}."
+        )
+
+    return dataframe
+
 # --- FUNCTIONS ----------------------------------------------------------------
 
 def load_nodes(filepath):
@@ -92,9 +136,11 @@ def load_nodes(filepath):
     # with "#". Our test fixture CSVs have comment headers that explain
     # the data — this ensures pandas ignores those explanatory lines
     # and only reads actual data rows.
-    nodes_df = pd.read_csv(filepath, comment="#")
-
-    return nodes_df
+    return _read_csv_with_validation(
+        filepath,
+        REQUIRED_NODE_COLUMNS,
+        dataset_label="node data",
+    )
 
 
 def load_edges(filepath):
@@ -111,9 +157,11 @@ def load_edges(filepath):
         pandas.DataFrame: A table where each row is one recommendation edge.
     """
 
-    edges_df = pd.read_csv(filepath, comment="#")
-
-    return edges_df
+    return _read_csv_with_validation(
+        filepath,
+        REQUIRED_EDGE_COLUMNS,
+        dataset_label="edge data",
+    )
 
 
 def build_graph(nodes_df, edges_df):

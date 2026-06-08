@@ -201,6 +201,53 @@ def test_load_edges_has_required_columns(edges_df):
         )
 
 
+def test_load_nodes_raises_for_missing_file(tmp_path):
+    """
+    WHAT: Loading a missing node CSV should fail with a clear file error.
+
+    WHY: Users need a message that points them to dataset setup instead of a
+         generic pandas traceback.
+    """
+    missing_path = tmp_path / "missing_nodes.csv"
+
+    with pytest.raises(FileNotFoundError, match="data/README.md"):
+        load_nodes(missing_path)
+
+
+def test_load_nodes_raises_for_missing_required_columns(tmp_path):
+    """
+    WHAT: A node CSV missing CHANNEL_ID or LR should fail immediately.
+
+    WHY: Silent schema degradation would make later graph and ideology results
+         look valid even though the dataset is malformed.
+    """
+    bad_nodes_csv = tmp_path / "bad_nodes.csv"
+    bad_nodes_csv.write_text(
+        "CHANNEL_TITLE\n"
+        "Only Title\n"
+    )
+
+    with pytest.raises(ValueError, match="missing required column"):
+        load_nodes(bad_nodes_csv)
+
+
+def test_load_edges_raises_for_missing_required_columns(tmp_path):
+    """
+    WHAT: An edge CSV missing its source/target/weight schema should fail.
+
+    WHY: The simulator depends on the edge weight column to preserve the
+         intended weighted-random-walk behavior.
+    """
+    bad_edges_csv = tmp_path / "bad_edges.csv"
+    bad_edges_csv.write_text(
+        "FROM_CHANNEL_ID,TO_CHANNEL_ID\n"
+        "A,B\n"
+    )
+
+    with pytest.raises(ValueError, match="missing required column"):
+        load_edges(bad_edges_csv)
+
+
 # ==============================================================================
 # TESTS — Graph Construction
 # ==============================================================================

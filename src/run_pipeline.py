@@ -261,41 +261,41 @@ def build_argument_parser():
     parser.add_argument(
         "--nodes-path",
         default=str(DEFAULT_NODES_PATH),
-        help="Path to vis_channel_stats.csv",
+        help="Path to the node CSV (default: %(default)s)",
     )
     parser.add_argument(
         "--edges-path",
         default=str(DEFAULT_EDGES_PATH),
-        help="Path to vis_channel_recs2.csv",
+        help="Path to the edge CSV (default: %(default)s)",
     )
     parser.add_argument(
         "--output-dir",
         default=str(DEFAULT_OUTPUT_DIR),
-        help="Directory where results/figures and results/tables are written",
+        help="Directory where figures and summary tables are written (default: %(default)s)",
     )
     parser.add_argument(
         "--num-steps",
         type=int,
         default=DEFAULT_NUM_STEPS,
-        help="Maximum number of moves per walk",
+        help="Maximum number of recommendation moves after the starting node (default: %(default)s)",
     )
     parser.add_argument(
         "--walks-per-start",
         type=int,
         default=DEFAULT_WALKS_PER_START,
-        help="How many walks to run from each starting node",
+        help="How many walks to run from each valid starting node (default: %(default)s)",
     )
     parser.add_argument(
         "--seed",
         type=int,
         default=DEFAULT_RANDOM_SEED,
-        help="Base random seed used for reproducible repeated runs",
+        help="Base random seed; repeat k uses seed + k for reproducible repeated runs (default: %(default)s)",
     )
     parser.add_argument(
         "--repeat-count",
         type=int,
         default=DEFAULT_REPEAT_COUNT,
-        help="How many repeated runs to execute using seed offsets",
+        help="How many repeated runs to execute using seed offsets (default: %(default)s)",
     )
 
     return parser
@@ -305,16 +305,20 @@ def main(argv=None):
     parser = build_argument_parser()
     args = parser.parse_args(argv)
 
-    summary = run_pipeline(
-        nodes_path=args.nodes_path,
-        edges_path=args.edges_path,
-        output_dir=args.output_dir,
-        num_steps=args.num_steps,
-        walks_per_start=args.walks_per_start,
-        seed=args.seed,
-        repeat_count=args.repeat_count,
-        show_progress=True,
-    )
+    try:
+        summary = run_pipeline(
+            nodes_path=args.nodes_path,
+            edges_path=args.edges_path,
+            output_dir=args.output_dir,
+            num_steps=args.num_steps,
+            walks_per_start=args.walks_per_start,
+            seed=args.seed,
+            repeat_count=args.repeat_count,
+            show_progress=True,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Pipeline failed: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
 
     metrics_dict = summary["metrics"]
     print("Pipeline completed successfully.")

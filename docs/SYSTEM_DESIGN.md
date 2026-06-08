@@ -93,7 +93,7 @@ Why simulation is separated from metrics:
 Key implementation choices:
 
 - Uses `RELEVANT_IMPRESSIONS_DAILY` as the default edge weight.
-- Falls back to uniform choice when all outgoing weights are zero or unusable.
+- Warns and falls back to uniform choice when all outgoing weights are zero, missing, or otherwise unusable.
 - Stops cleanly at dead ends instead of fabricating extra steps.
 - Accepts a seeded `random.Random` instance for deterministic tests.
 
@@ -156,7 +156,6 @@ Implemented public functions:
 - `plot_trajectory_sample(trajectories, output_path, max_lines=10)`
 - `plot_extremity_distribution(trajectories, output_path)`
 - `save_metrics_table(metrics_dict, output_path)`
-- `save_rows_table(rows, output_path, fieldnames)`
 - `generate_all_figures(G, trajectories, metrics_dict, output_dir="results")`
 
 Why this module also covers reporting:
@@ -171,7 +170,6 @@ Key implementation choices:
 - Uses seaborn styling for readable defaults.
 - Writes local artifacts into `results/figures/` and `results/tables/`.
 - Shows a readable subset of walk trajectories with ideology reference lines instead of plotting every walk at once.
-- Clears stale image files before writing a new baseline figure bundle, while preserving older CSV tables unless a run overwrites a specific filename.
 - Closes figures after saving to avoid memory buildup.
 
 ### 6. Orchestration and Runnable Script
@@ -208,6 +206,7 @@ Implemented orchestration model:
 - Each repeat runs the same start-node rule and same walk settings.
 - The pipeline writes four core figures, `summary_metrics.csv`, and one
   `repeated_runs_summary.csv` table with one row per repeat plus one aggregate row.
+- CLI failures now stop with a clear non-zero exit status for missing data files or invalid pipeline arguments.
 
 ## Data Flow
 
@@ -225,6 +224,14 @@ CSV files
 ```
 
 The design stays local and in-memory. There is no database, API server, message queue, or front-end application because the current project does not need them. The workload is a research pipeline over a static dataset, so keeping everything in Python objects is the most direct and least fragile option.
+
+## Methodological Boundaries
+
+- The recommendation data is logged-off and historical, so the code studies default recommendation structure rather than personalized user feeds.
+- Early walk termination at dead ends is intentional, but it can bias drift summaries if out-degree differs across ideology groups.
+- `compute_ideology_assortativity()` runs on the directed recommendation graph to summarize whether connected channels tend to share ideology scores.
+- `compute_average_clustering()` converts the graph to undirected form because the triangle-style clustering coefficient is easier to interpret in local neighborhood terms.
+- The `L/C/R -> -1/0/+1` mapping is a useful abstraction for this project, but it compresses a much richer political spectrum into one axis.
 
 ## Actual Project Layout
 
@@ -313,7 +320,6 @@ To avoid stale expectations, these are not implemented right now:
 
 - No web application, browser dashboard, or API.
 - No live scraping or streaming ingestion.
-- No committed generated output artifacts from the real dataset.
 - No separate reporting module beyond the figure and CSV helpers in `visualize.py`.
 
 ## Source-of-Truth Rule

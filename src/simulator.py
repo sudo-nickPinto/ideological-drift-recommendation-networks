@@ -75,6 +75,7 @@
 
 
 import random
+import warnings
 
 from src.ideology import SCORE_ATTRIBUTE
 
@@ -133,8 +134,12 @@ def choose_next_node(G, current_node, rng=None, weight_attr=DEFAULT_WEIGHT_ATTRI
 		return None
 
 	weights = []
+	has_any_weight_attribute = False
 	for neighbor in neighbors:
-		raw_weight = G.edges[current_node, neighbor].get(weight_attr, 0.0)
+		edge_data = G.edges[current_node, neighbor]
+		if weight_attr in edge_data:
+			has_any_weight_attribute = True
+		raw_weight = edge_data.get(weight_attr, 0.0)
 
 		# Edge weights should be numeric, but robust code assumes real data
 		# can be messy. If conversion fails, treat the edge as zero-weight.
@@ -151,6 +156,22 @@ def choose_next_node(G, current_node, rng=None, weight_attr=DEFAULT_WEIGHT_ATTRI
 	# no probability mass to work with. In that case we fall back to a plain
 	# uniform random choice across existing outgoing neighbors.
 	if sum(weights) == 0:
+		if not has_any_weight_attribute:
+			warnings.warn(
+				f"Outgoing edges from '{current_node}' are missing the weight "
+				f"attribute '{weight_attr}'. Falling back to uniform random "
+				"choice.",
+				RuntimeWarning,
+				stacklevel=2,
+			)
+		else:
+			warnings.warn(
+				f"Outgoing edges from '{current_node}' have no usable positive "
+				f"values for '{weight_attr}'. Falling back to uniform random "
+				"choice.",
+				RuntimeWarning,
+				stacklevel=2,
+			)
 		return rng.choice(neighbors)
 
 	# random.choices returns a list even when k=1, so we take [0].
